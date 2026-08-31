@@ -2,8 +2,41 @@
 # ════════════════════════════════════════════════════════════════════════════
 # load_info.sh — auto-detect hardware and write config.nix
 # Run as your normal user (not sudo) — no root needed.
+# Flags:
+#   --stub   write stub content to config.nix and hardware-configuration.nix
+#            (use before pushing flake changes from any device, then rerun normally)
 # ════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG="$SCRIPT_DIR/config.nix"
+HW_DST="$SCRIPT_DIR/hardware-configuration.nix"
+
+# ── --stub mode ───────────────────────────────────────────────────────────────
+if [[ "${1:-}" == "--stub" ]]; then
+  cat > "$CONFIG" <<'NIXEOF'
+# Stub — run sudo bash load_info.sh to populate with real machine config
+{
+  hostname         = "nixos";
+  user             = "user";
+  powerProfile     = "balanced";
+  cpuVendor        = "amd";
+  gpu              = "amd";
+  nvidiaBusId      = "";
+  amdBusId         = "";
+  intelBusId       = "";
+  inputSensitivity = "-0.1";
+}
+NIXEOF
+  cat > "$HW_DST" <<'NIXEOF'
+# Stub — run sudo bash load_info.sh to populate with real hardware config
+{ config, lib, pkgs, modulesPath, ... }: {}
+NIXEOF
+  git -C "$SCRIPT_DIR" update-index --no-assume-unchanged "$CONFIG" "$HW_DST" 2>/dev/null || true
+  git -C "$SCRIPT_DIR" add "$CONFIG" "$HW_DST" 2>/dev/null || true
+  echo "Stubs written. Safe to commit and push. Run load_info.sh again after to restore."
+  exit 0
+fi
 
 # Ensure NixOS system binaries are on PATH (lspci lives here)
 export PATH="/run/current-system/sw/bin:/run/wrappers/bin:$PATH"
@@ -12,9 +45,6 @@ if ! command -v lspci &>/dev/null; then
   echo "error: lspci not found — install pciutils or run: nix-shell -p pciutils --run './load_info.sh'"
   exit 1
 fi
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG="$SCRIPT_DIR/config.nix"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
