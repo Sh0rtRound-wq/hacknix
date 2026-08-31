@@ -4,10 +4,9 @@ Portable NixOS flake with Hyprland rice, matugen theming, and pentest/gaming pro
 
 ## First Time Setup
 
-**1. Clone and copy your hardware config**
+**1. Clone**
 ```bash
 git clone https://github.com/Sh0rtRound-wq/hacknix ~/hacknix
-cp /etc/nixos/hardware-configuration.nix ~/hacknix/
 ```
 
 **2. Auto-detect machine settings**
