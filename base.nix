@@ -1,0 +1,392 @@
+{ config, pkgs, lib, flake, hostname, homeUser, powerProfile, gpu, cpuVendor, nvidiaBusId, amdBusId, intelBusId, ... }:
+let
+  isNvidia = builtins.elem gpu [ "nvidia" "prime-nvidia-amd" "prime-nvidia-intel" ];
+  isPrime  = builtins.elem gpu [ "prime-nvidia-amd" "prime-nvidia-intel" ];
+  isAmdCpu = cpuVendor == "amd";
+in
+{
+  imports = [ ./hardware-configuration.nix ];
+
+  # ── Boot ──────────────────────────────────────────────────────────────
+  boot.loader.systemd-boot.enable      = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+  boot.initrd.kernelModules = lib.optionals isNvidia [ "nvidia" "nvidia_modeset" "nvidia_uvm" "nvidia_drm" ];
+  boot.kernelParams = [
+    "quiet" "splash" "loglevel=3"
+    "rd.systemd.show_status=false"
+    "rd.udev.log_level=3"
+    "udev.log_priority=3"
+    "tsc=reliable"
+  ] ++ lib.optionals isNvidia [ "nvidia-drm.fbdev=1" ]
+    ++ lib.optionals isAmdCpu [ "amd_pstate=active" ];
+  boot.consoleLogLevel = 0;
+  boot.initrd.verbose  = false;
+
+  # ── Plymouth boot splash ───────────────────────────────────────────────
+  # No display manager — plymouth-quit-wait would block 60s waiting for
+  # graphical.target that never fires (UWSM starts from shell, not a DM).
+  systemd.services."plymouth-quit-wait".enable = false;
+  boot.plymouth = {
+    enable = true;
+    theme  = "simple";
+    themePackages = [
+      (pkgs.stdenv.mkDerivation {
+        pname   = "plymouth-theme-simple";
+        version = "1.0";
+        src     = ./rice/plymouth/simple;
+        installPhase = ''
+          mkdir -p $out/share/plymouth/themes/simple
+          cp -r * $out/share/plymouth/themes/simple/
+          substituteInPlace $out/share/plymouth/themes/simple/simple.plymouth \
+            --replace "@out@" "$out"
+        '';
+      })
+    ];
+  };
+
+  # ── Kernel optimizations ──────────────────────────────────────────────
+  boot.kernelPackages = pkgs.linuxPackages_latest;
+  boot.kernelModules          = [ "tcp_bbr" ];
+  boot.extraModulePackages    = [ config.boot.kernelPackages.r8168 ];
+  boot.blacklistedKernelModules = [ "r8169" ];
+  boot.kernel.sysctl  = {
+    "net.ipv4.tcp_congestion_control" = "bbr";
+    "net.core.default_qdisc"          = "fq";
+    "net.core.wmem_max"               = 1073741824;
+    "net.core.rmem_max"               = 1073741824;
+    "net.ipv4.tcp_rmem"               = "4096 87380 1073741824";
+    "net.ipv4.tcp_wmem"               = "4096 87380 1073741824";
+    "net.core.netdev_max_backlog"     = 16384;
+    "net.ipv4.tcp_fastopen"           = 3;
+    "net.ipv4.tcp_mtu_probing"        = 1;
+    "net.ipv4.ip_local_port_range"    = "1024 65535";
+    "vm.max_map_count"                = 2147483642;
+    "net.ipv6.conf.all.use_tempaddr"     = 2;
+  };
+  services.irqbalance.enable = true;
+  hardware.cpu.amd.updateMicrocode = lib.mkIf isAmdCpu true;
+  powerManagement.cpuFreqGovernor  = if powerProfile == "performance" then "performance"
+                                     else if powerProfile == "balanced"   then "schedutil"
+                                     else "powersave";
+  networking.hostName = hostname;
+  networking.networkmanager.enable = true;
+  networking.networkmanager.wifi.macAddress = "random";
+  networking.networkmanager.ethernet.macAddress = "random";
+  networking.networkmanager.wifi.scanRandMacAddress = true;
+  networking.firewall.enable = false;
+  time.timeZone = "America/New_York";
+  i18n.defaultLocale = "en_US.UTF-8";
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS        = "en_US.UTF-8";
+    LC_IDENTIFICATION = "en_US.UTF-8";
+    LC_MEASUREMENT    = "en_US.UTF-8";
+    LC_MONETARY       = "en_US.UTF-8";
+    LC_NAME           = "en_US.UTF-8";
+    LC_NUMERIC        = "en_US.UTF-8";
+    LC_PAPER          = "en_US.UTF-8";
+    LC_TELEPHONE      = "en_US.UTF-8";
+    LC_TIME           = "en_US.UTF-8";
+  };
+  programs.hyprland = {
+    enable          = true;
+    withUWSM        = true;
+    xwayland.enable = true;
+  };
+  programs.uwsm.enable = true;
+  programs.zsh.enable = true;
+  programs.bash.loginShellInit = ''
+    if [ "$(tty)" = "/dev/tty1" ]; then
+      exec uwsm start hyprland-uwsm.desktop
+    fi
+  '';
+
+  services.getty.autologinUser = homeUser;
+  systemd.services."getty@tty1".overrideStrategy = "asDropin";
+  systemd.services."getty@tty1".serviceConfig.ExecStart = [
+    ""
+    "@${pkgs.util-linux}/sbin/agetty agetty --login-program ${pkgs.shadow}/bin/login --autologin ${homeUser} --noclear %I $TERM"
+  ];
+  environment.sessionVariables.HYPRLAND_NO_SD_NOTIFY  = "1";
+  environment.variables.HYPRLAND_NO_UWSM_CHECK = "1";
+  services.xserver.xkb = { layout = "us"; variant = ""; };
+  environment.etc."xdg/kitty/kitty.conf".text = ''
+    confirm_os_window_close 0
+    cursor_trail 100
+    cursor_trail_decay 0.15 0.75
+    cursor_trail_start_threshold 1
+    cursor_shape block
+    font_family JetBrains Mono
+    font_size 16.0
+    scrollback_lines 2000
+    window_padding_width 4
+    # Dynamic colors from matugen (regenerated by `matugen image <wallpaper>`)
+    include /tmp/kitty-matugen-colors.conf
+    background #000000
+  '';
+  xdg.portal = {
+    enable           = true;
+    xdgOpenUsePortal = true;
+    config = {
+      common.default   = [ "gtk" ];
+      hyprland.default = [ "gtk" "hyprland" ];
+    };
+    extraPortals = with pkgs; [
+      xdg-desktop-portal-hyprland
+      xdg-desktop-portal-gtk
+    ];
+  };
+  security.polkit.enable = true;
+  services.pulseaudio.enable = false;
+  security.rtkit.enable = true;
+  services.pipewire = {
+    enable            = true;
+    alsa.enable       = true;
+    alsa.support32Bit = true;
+    pulse.enable      = true;
+    jack.enable       = true; # Guitarix relies on JACK or JACK-shims
+  };
+  users.users.${homeUser} = {
+    isNormalUser = true;
+    description  = homeUser;
+    shell        = pkgs.zsh;
+    extraGroups  = [ "dialout" "input" "networkmanager" "render" "video" "wheel" "docker" ];
+  };
+  security.pam.u2f = {
+    enable       = true;
+    settings.cue = true;
+  };
+  security.pam.services = {
+    login.u2fAuth = true;
+    sudo.u2fAuth  = true;
+  };
+  programs.firefox.enable = true;
+  nixpkgs.config.allowUnfree = true;
+  nixpkgs.overlays = [
+    (final: prev: {
+      quickshell = prev.quickshell.overrideAttrs (old: {
+        buildInputs = old.buildInputs ++ [ prev.qt6.qtmultimedia ];
+      });
+    })
+  ];
+  environment.systemPackages = with pkgs; [
+foot
+kitty
+zsh
+fzf
+tree
+btop
+fastfetch
+cbonsai
+pipes
+inotify-tools
+file
+git
+gcc
+go
+curl
+wget
+jq
+bc
+socat
+zbar
+grim
+slurp
+grimblast
+wl-clipboard
+wl-clip-persist
+xdg-utils
+xwayland
+imagemagick
+hyprpicker
+pam_u2f
+playerctl
+pamixer
+pavucontrol
+brightnessctl
+udiskie
+uwsm
+swayosd
+libnotify
+networkmanagerapplet
+waybar
+rofi
+swaynotificationcenter
+hyprlock
+hyprpolkitagent
+hypridle
+awww
+quickshell
+cliphist
+nautilus
+discord
+matugen
+mpv
+obs-studio
+easyeffects
+gpu-screen-recorder
+obsidian
+taskwarrior3
+net-tools
+inetutils
+dig
+wireguard-tools
+openvpn
+libxml2
+neovim
+vim
+python3
+nodejs_24
+bun
+ruby
+php
+go
+android-tools
+docker
+docker-compose
+libsecret
+librewolf
+ungoogled-chromium
+dotnet-runtime
+appimage-run
+wine
+ansible
+home-manager
+claude-code
+anytype
+xclip
+vlc
+ntp
+systemdUkify
+firefox-esr
+busybox
+p7zip
+bottles
+ollama
+bluez
+bluez-tools
+speedtest-go
+ffmpeg
+pulseaudio
+hyprshot
+protontricks
+jdk17
+jdk21
+virtualbox
+davinci-resolve
+kdePackages.kate
+oterm
+onlyoffice-desktopeditors
+syncthing
+strawberry
+lazygit
+pokemon-colorscripts
+];
+
+# edit
+
+  networking.extraHosts = ''
+
+'';
+
+  fonts.packages = with pkgs; [
+    nerd-fonts.jetbrains-mono
+    nerd-fonts.iosevka
+    noto-fonts
+    liberation_ttf
+  ];
+  fonts.fontconfig = {
+    enable         = true;
+    hinting.style  = "slight";
+    subpixel.rgba  = "rgb";
+  };
+  hardware.bluetooth.enable             = true;
+  hardware.bluetooth.powerOnBoot        = false;
+  services.openssh.enable              = false;
+  services.flatpak.enable              = true;
+  services.blueman.enable              = true;
+  services.power-profiles-daemon.enable = true;
+  # power-profiles-daemon ships with After=multi-user.target + WantedBy=graphical.target.
+  # Without a display manager graphical.target never fires, so the daemon never starts.
+  # This drop-in replaces its After= with just dbus.service and pulls it into
+  # multi-user.target so it is available at boot.
+  # power-profiles-daemon ships WantedBy=graphical.target which never fires without
+  # a display manager.  Pull it into multi-user.target so it actually starts.
+  systemd.services.power-profiles-daemon = {
+    overrideStrategy = "asDropin";
+    wantedBy         = [ "multi-user.target" ];
+  };
+
+  # Lock power profile statically — set powerProfile in config.nix to change it.
+  # Runs after multi-user.target (so it never blocks the target from completing)
+  # and after power-profiles-daemon is ready.
+  systemd.services.static-power-profile = {
+    description = "Lock power profile to ${powerProfile}";
+    after       = [ "multi-user.target" "power-profiles-daemon.service" ];
+    wants       = [ "power-profiles-daemon.service" ];
+    wantedBy    = [ "multi-user.target" ];
+    serviceConfig = {
+      Type         = "oneshot";
+      ExecStartPre = "${pkgs.coreutils}/bin/sleep 2";
+      ExecStart    = "${pkgs.power-profiles-daemon}/bin/powerprofilesctl set ${powerProfile}";
+    };
+  };
+  # ── Syncthing ─────────────────────────────────────────────────────────
+  # Runs as a proper systemd service under the logged-in user.
+  # Runs with standard discovery and relay. Web UI bound to localhost only.
+  # Portable: uses homeUser var. Devices/folders not overridden on rebuild.
+  services.syncthing = {
+    enable    = true;
+    user      = homeUser;
+    dataDir   = "/home/${homeUser}";
+    configDir = "/home/${homeUser}/.config/syncthing";
+    openDefaultPorts  = false;  # don't punch holes in the firewall
+    overrideDevices   = false;  # don't wipe manually added devices on rebuild
+    overrideFolders   = false;  # don't wipe manually added folders on rebuild
+    settings = {
+      gui.address = "127.0.0.1:8384";  # web UI reachable only from localhost
+      options = {
+        localAnnounceEnabled  = true;
+        globalAnnounceEnabled = true;
+        natEnabled            = true;
+      };
+    };
+  };
+
+  services.printing.enable             = true;
+  programs.dconf.enable                = true;
+  virtualisation.libvirtd.enable = true;
+  virtualisation.docker.enable   = true;
+  hardware.graphics.enable       = true;
+  hardware.graphics.enable32Bit  = true;
+  hardware.graphics.extraPackages = with pkgs; [
+    vulkan-loader
+    vulkan-validation-layers
+  ];
+  hardware.nvidia.modesetting.enable          = lib.mkIf isNvidia true;
+  hardware.nvidia.open                        = lib.mkIf isNvidia false;
+  hardware.nvidia.nvidiaSettings              = lib.mkIf isNvidia true;
+  hardware.nvidia.package                     = lib.mkIf isNvidia config.boot.kernelPackages.nvidiaPackages.stable;
+  hardware.nvidia.powerManagement.enable      = lib.mkIf isNvidia false;
+  hardware.nvidia.powerManagement.finegrained = lib.mkIf isNvidia false;
+  hardware.nvidia.prime.sync.enable           = lib.mkIf isPrime true;
+  hardware.nvidia.prime.nvidiaBusId           = lib.mkIf isPrime nvidiaBusId;
+  hardware.nvidia.prime.amdgpuBusId           = lib.mkIf (gpu == "prime-nvidia-amd") amdBusId;
+  hardware.nvidia.prime.intelBusId            = lib.mkIf (gpu == "prime-nvidia-intel") intelBusId;
+  services.xserver.enable = false;
+  services.xserver.videoDrivers              = lib.mkIf isNvidia [ "nvidia" ];
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="usb", DRIVERS=="usb", ATTR{power/autosuspend}="-1"
+    ACTION=="change", SUBSYSTEM=="power_supply", ATTR{type}=="Mains", RUN+="${pkgs.systemd}/bin/systemctl restart static-power-profile.service"
+  '';
+  security.sudo.extraConfig = ''
+    Defaults env_keep += "HOME"
+  '';
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  nix.registry.${homeUser} = { flake = flake; };
+  nix.gc = {
+    automatic = true;
+    dates     = "daily";
+    options   = "--delete-older-than 14d";
+  };
+  system.stateVersion = "25.05";
+}

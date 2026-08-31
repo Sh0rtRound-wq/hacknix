@@ -1,0 +1,52 @@
+/* SwayOSD Matugen Theme */
+
+window {
+    background: transparent;
+}
+
+window#osd {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+window#osd #container,
+window#osd-container {
+    background-color: {{colors.surface.default.hex}};
+    border: 2px solid {{colors.primary.default.hex}};
+    border-radius: 32px;
+    padding: 16px;
+    margin: 16px;
+    min-width: 250px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+trough {
+    background-color: {{colors.surface_container_low.default.hex}};
+    border-radius: 99px;
+    border: none;
+    min-height: 12px;
+    min-width: 200px;
+}
+
+progress {
+    background-image: linear-gradient(to right, {{colors.primary.default.hex}}, {{colors.secondary.default.hex}});
+    border-radius: 99px;
+    border: none;
+    min-height: 12px;
+    margin: 0px;
+    padding: 0px;
+    min-width: 0px;
+}
+
+label {
+    color: {{colors.on_surface.default.hex}};
+    font-weight: 800;
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+
+image {
+    color: {{colors.primary.default.hex}};
+    -gtk-icon-style: symbolic;
+}
