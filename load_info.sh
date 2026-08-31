@@ -46,7 +46,7 @@ else
 fi
 CURRENT_POWER="balanced"
 
-if [ -f "$CONFIG" ]; then
+if [ -f "$CONFIG" ] && ! grep -q "# Stub" "$CONFIG"; then
   u=$(nix_str "user"         "$CONFIG"); [ -n "$u" ] && CURRENT_USER="$u"
   p=$(nix_str "powerProfile" "$CONFIG"); [ -n "$p" ] && CURRENT_POWER="$p"
 fi
