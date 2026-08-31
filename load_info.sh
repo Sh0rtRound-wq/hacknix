@@ -145,6 +145,19 @@ cat > "$CONFIG" <<NIXEOF
 NIXEOF
 
 echo "Done. config.nix written."
+git -C "$SCRIPT_DIR" update-index --assume-unchanged "$CONFIG" 2>/dev/null || true
+
+# ── Populate hardware-configuration.nix ──────────────────────────────────────
+HW_SRC="/etc/nixos/hardware-configuration.nix"
+HW_DST="$SCRIPT_DIR/hardware-configuration.nix"
+if [ -f "$HW_SRC" ]; then
+  cp "$HW_SRC" "$HW_DST"
+  # Tell git to ignore local changes so the filled file is never accidentally committed
+  git -C "$SCRIPT_DIR" update-index --assume-unchanged "$HW_DST" 2>/dev/null || true
+  echo "Copied hardware-configuration.nix from $HW_SRC"
+else
+  echo "warning: $HW_SRC not found — run 'nixos-generate-config' first"
+fi
 
 # ── Write hardware env vars to settings.json ──────────────────────────────────
 # Populates the {{HARDWARE_ENV}} placeholder used by settings_watcher.sh

@@ -5,7 +5,7 @@ let
   isAmdCpu = cpuVendor == "amd";
 in
 {
-  imports = [ /etc/nixos/hardware-configuration.nix ];
+  imports = [ ./hardware-configuration.nix ];
 
   # ── Boot ──────────────────────────────────────────────────────────────
   boot.loader.systemd-boot.enable      = true;
