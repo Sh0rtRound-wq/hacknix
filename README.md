@@ -6,7 +6,7 @@ Portable NixOS flake with Hyprland rice, matugen theming, and pentest/gaming pro
 
 **1. Clone and copy your hardware config**
 ```bash
-git clone https://github.com/YOUR_USERNAME/hacknix ~/hacknix
+git clone https://github.com/Sh0rtRound-wq/hacknix ~/hacknix
 cp /etc/nixos/hardware-configuration.nix ~/hacknix/
 ```
 
@@ -36,15 +36,6 @@ That's it. The rice, keybinds, and theming are all declarative — no manual set
 |---------|----------|
 | `pentest` | Offensive security tools, CTF tooling |
 | `gaming` | Gaming packages, performance tuning |
-
-## Per-machine config
-
-`config.nix` is the only file that changes between machines. It is gitignored — do not commit it. Use `config.nix.example` as a reference.
-
-`hardware-configuration.nix` is also gitignored — generate it fresh per machine with:
-```bash
-nixos-generate-config --show-hardware-config > ~/hacknix/hardware-configuration.nix
-```
 
 ## Monitor / display config
 
