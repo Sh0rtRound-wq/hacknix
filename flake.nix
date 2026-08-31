@@ -1,6 +1,10 @@
 {
   description = "sh0rtround system";
 
+  nixConfig = {
+    pure-eval = false;
+  };
+
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/4bd9165a9165";
 
