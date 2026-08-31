@@ -146,16 +146,6 @@ NIXEOF
 
 echo "Done. config.nix written."
 
-# ── Symlink hardware-configuration.nix ───────────────────────────────────────
-HW_SRC="/etc/nixos/hardware-configuration.nix"
-HW_DST="$SCRIPT_DIR/hardware-configuration.nix"
-if [ -f "$HW_SRC" ]; then
-  ln -sf "$HW_SRC" "$HW_DST"
-  echo "Symlinked hardware-configuration.nix → $HW_SRC"
-else
-  echo "warning: $HW_SRC not found — run 'nixos-generate-config' first"
-fi
-
 # ── Write hardware env vars to settings.json ──────────────────────────────────
 # Populates the {{HARDWARE_ENV}} placeholder used by settings_watcher.sh
 # so the Hyprland env.conf gets the right GPU-specific vars on this machine.
