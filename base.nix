@@ -352,6 +352,13 @@ pokemon-colorscripts
     };
   };
 
+  services.ollama = {
+    enable  = true;
+    package = if isNvidia then pkgs.ollama-cuda
+              else if gpu == "amd" then pkgs.ollama-rocm
+              else pkgs.ollama;
+  };
+
   services.printing.enable             = true;
   programs.dconf.enable                = true;
   virtualisation.libvirtd.enable = true;
