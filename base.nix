@@ -280,9 +280,10 @@ syncthing
 strawberry
 lazygit
 pokemon-colorscripts
+nix-search-cli
 ];
 
-# edit
+# nixadd
 
   networking.extraHosts = ''
 

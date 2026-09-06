@@ -14,7 +14,7 @@ qpwgraph
 bolt-launcher
 ];
 
-# edit
+# nixadd
 
   programs.steam.enable = true;
 
