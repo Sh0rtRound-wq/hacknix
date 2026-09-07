@@ -281,6 +281,7 @@ strawberry
 lazygit
 pokemon-colorscripts
 nix-search-cli
+element-desktop
 ];
 
 # nixadd
