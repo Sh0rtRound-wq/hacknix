@@ -223,7 +223,6 @@ discord
 matugen
 mpv
 obs-studio
-easyeffects
 gpu-screen-recorder
 obsidian
 taskwarrior3

@@ -131,7 +131,6 @@ in
   };
 
   fonts.fontconfig.enable = true;
-  services.easyeffects.enable = true;
 
   services.swayosd = {
     enable    = true;
