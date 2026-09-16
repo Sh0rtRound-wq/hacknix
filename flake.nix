@@ -10,9 +10,11 @@
     };
 
     nixpkgs-neo4j.url = "github:NixOS/nixpkgs/nixos-22.11";
+
+    nur.url = "github:nix-community/NUR";
   };
 
-  outputs = { self, nixpkgs, home-manager, nixpkgs-neo4j, ... }:
+  outputs = { self, nixpkgs, home-manager, nixpkgs-neo4j, nur, ... }:
   let
     cfg = import ./config.nix;
 
@@ -20,7 +22,7 @@
       nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = {
-          inherit nixpkgs-neo4j;
+          inherit nixpkgs-neo4j nur;
           flake        = self;
           hostname     = hostname;
           homeUser     = user;

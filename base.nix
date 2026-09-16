@@ -1,8 +1,9 @@
-{ config, pkgs, lib, flake, hostname, homeUser, powerProfile, gpu, cpuVendor, nvidiaBusId, amdBusId, intelBusId, ... }:
+{ config, pkgs, lib, flake, nur, hostname, homeUser, powerProfile, gpu, cpuVendor, nvidiaBusId, amdBusId, intelBusId, ... }:
 let
   isNvidia = builtins.elem gpu [ "nvidia" "prime-nvidia-amd" "prime-nvidia-intel" ];
   isPrime  = builtins.elem gpu [ "prime-nvidia-amd" "prime-nvidia-intel" ];
   isAmdCpu = cpuVendor == "amd";
+  nurPkgs  = nur.legacyPackages.${pkgs.system};
 in
 {
   imports = [ ./hardware-configuration.nix ];
@@ -280,8 +281,8 @@ syncthing
 strawberry
 lazygit
 pokemon-colorscripts
-nix-search-cli
 element-desktop
+nurPkgs.repos.sh0rtround.nix-easy-search
 ];
 
 # nixadd
