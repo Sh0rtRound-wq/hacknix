@@ -1,5 +1,6 @@
 configuration{
     modi: "run,drun,window";
+    kb-accept-entry: "Control+j,Control+m,Return,KP_Enter";
     lines: 5;
     cycle: false;
     font: "Maple Mono Bold 16";

@@ -312,6 +312,12 @@ Item {
                             }
                             event.accepted = true;
                         }
+                        Keys.onEnterPressed: {
+                            if (appList.currentIndex >= 0 && appList.currentIndex < appModel.count) {
+                                launchApp(appModel.get(appList.currentIndex).exec);
+                            }
+                            event.accepted = true;
+                        }
                         Keys.onEscapePressed: {
                             Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "close"]);
                             event.accepted = true;
