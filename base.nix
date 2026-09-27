@@ -3,7 +3,6 @@ let
   isNvidia = builtins.elem gpu [ "nvidia" "prime-nvidia-amd" "prime-nvidia-intel" ];
   isPrime  = builtins.elem gpu [ "prime-nvidia-amd" "prime-nvidia-intel" ];
   isAmdCpu = cpuVendor == "amd";
-  nurPkgs  = nur.legacyPackages.${pkgs.system};
 in
 {
   imports = [ ./hardware-configuration.nix ];
@@ -163,6 +162,7 @@ in
   programs.firefox.enable = true;
   nixpkgs.config.allowUnfree = true;
   nixpkgs.overlays = [
+    (final: _: { nur = import nur { nurpkgs = final; pkgs = final; }; })
     (final: prev: {
       quickshell = prev.quickshell.overrideAttrs (old: {
         buildInputs = old.buildInputs ++ [ prev.qt6.qtmultimedia ];
@@ -281,7 +281,8 @@ strawberry
 lazygit
 pokemon-colorscripts
 element-desktop
-nurPkgs.repos.sh0rtround.nix-easy-search
+pkgs.nur.repos.sh0rtround.nix-easy-search
+cosmic-ext-calculator
 ];
 
 # nixadd
