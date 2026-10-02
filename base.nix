@@ -283,6 +283,8 @@ pokemon-colorscripts
 element-desktop
 pkgs.nur.repos.sh0rtround.nix-easy-search
 cosmic-ext-calculator
+yt-dlp
+gh
 ];
 
 # nixadd
