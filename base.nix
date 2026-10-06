@@ -218,7 +218,7 @@ hypridle
 awww
 quickshell
 cliphist
-nautilus
+thunar
 discord
 matugen
 mpv
