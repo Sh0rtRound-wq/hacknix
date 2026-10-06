@@ -12,6 +12,7 @@ wowup-cf
 guitarix
 qpwgraph
 bolt-launcher
+plex-desktop
 ];
 
 # nixadd
