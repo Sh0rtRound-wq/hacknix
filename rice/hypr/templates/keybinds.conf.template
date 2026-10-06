@@ -49,7 +49,7 @@ bindel = , xf86audioraisevolume, exec, swayosd-client --output-volume raise
 
 # ───────── Applications & Launchers ─────────
 bind = $mainMod, F, fullscreen,
-bind = $mainMod, E, exec, nautilus
+bind = $mainMod, E, exec, thunar
 bind = $mainMod, T, exec, Telegram
 bind = $mainMod, O, exec, obsidian
 bind = $mainMod, RETURN, exec, kitty

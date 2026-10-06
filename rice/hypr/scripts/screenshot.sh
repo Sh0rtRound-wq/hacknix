@@ -188,8 +188,8 @@ if [ -f "$CACHE_DIR/rec_pid" ]; then
         (
             ACTION=$(notify-send -a "Screen Recorder" -i "$FINAL_FILE" -A "default=Open Folder" "⏺ Recording Saved" "File: $(basename "$FINAL_FILE")\nFolder: $RECORD_DIR")
             if [ "$ACTION" = "default" ]; then
-                if command -v nautilus &> /dev/null; then
-                    nautilus "$RECORD_DIR"
+                if command -v thunar &> /dev/null; then
+                    thunar "$RECORD_DIR"
                 else
                     xdg-open "$RECORD_DIR"
                 fi
@@ -303,8 +303,8 @@ if [ "$FULL_MODE" = true ] || [ -n "$GEOMETRY" ]; then
         (
             ACTION=$(notify-send -a "Screenshot" -i "$FILENAME" -A "default=Open Folder" "Screenshot Saved" "File: Screenshot_$time.png\nFolder: $SAVE_DIR")
             if [ "$ACTION" = "default" ]; then
-                if command -v nautilus &> /dev/null; then
-                    nautilus "$SAVE_DIR"
+                if command -v thunar &> /dev/null; then
+                    thunar "$SAVE_DIR"
                 else
                     xdg-open "$SAVE_DIR"
                 fi
