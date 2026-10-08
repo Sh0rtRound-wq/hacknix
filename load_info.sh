@@ -26,6 +26,7 @@ if [[ "${1:-}" == "--stub" ]]; then
   amdBusId         = "";
   intelBusId       = "";
   inputSensitivity = "-0.1";
+  qsTheme          = "modern";
 }
 NIXEOF
   cat > "$HW_DST" <<'NIXEOF'
@@ -76,9 +77,11 @@ else
 fi
 CURRENT_POWER="balanced"
 
+CURRENT_QS_THEME="modern"
 if [ -f "$CONFIG" ] && ! grep -q "# Stub" "$CONFIG"; then
   u=$(nix_str "user"         "$CONFIG"); [ -n "$u" ] && CURRENT_USER="$u"
   p=$(nix_str "powerProfile" "$CONFIG"); [ -n "$p" ] && CURRENT_POWER="$p"
+  q=$(nix_str "qsTheme"      "$CONFIG"); [ -n "$q" ] && CURRENT_QS_THEME="$q"
 fi
 
 # ── Detect hardware ───────────────────────────────────────────────────────────
@@ -148,6 +151,7 @@ echo "  gpu mode:    $GPU_MODE"
 [ -n "$AMD_BUS"    ] && echo "  amd bus:     $AMD_BUS"
 [ -n "$INTEL_BUS"  ] && echo "  intel bus:   $INTEL_BUS"
 echo "  input:       $INPUT_DEVICE (sensitivity: $INPUT_SENSITIVITY)"
+echo "  qs theme:    $CURRENT_QS_THEME"
 echo ""
 printf "Write to config.nix? [Y/n] "
 read -r CONFIRM
@@ -171,6 +175,7 @@ cat > "$CONFIG" <<NIXEOF
   amdBusId         = "$AMD_BUS";         # only for prime-nvidia-amd, e.g. "PCI:197:0:0"
   intelBusId       = "$INTEL_BUS";       # only for prime-nvidia-intel, e.g. "PCI:0:2:0"
   inputSensitivity = "$INPUT_SENSITIVITY"; # "0.8" for touchpad, "-0.1" for mouse
+  qsTheme          = "$CURRENT_QS_THEME";  # "modern" or "minimalist"
 }
 NIXEOF
 
@@ -221,4 +226,14 @@ if [ -d "$NVIM_STATE" ]; then
     sudo chown -R "$CURRENT_USER:users" "$NVIM_STATE"
   fi
   echo "Fixed ownership of $NVIM_STATE → $CURRENT_USER:users"
+fi
+
+# ── Apply QS theme ────────────────────────────────────────────────────────────
+QS_THEME_FILE="$USER_HOME/.config/hypr/.qs_theme"
+mkdir -p "$(dirname "$QS_THEME_FILE")"
+echo "$CURRENT_QS_THEME" > "$QS_THEME_FILE"
+echo "QS theme set to: $CURRENT_QS_THEME"
+# If QS is running, kill it — systemd Restart=always or qs_manager watchdog relaunches it
+if pkill -f "quickshell.*Shell.qml" 2>/dev/null; then
+  echo "Quickshell restarted with theme: $CURRENT_QS_THEME"
 fi

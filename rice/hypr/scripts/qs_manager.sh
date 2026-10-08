@@ -3,7 +3,8 @@
 # -----------------------------------------------------------------------------
 # GLOBAL VARS
 # -----------------------------------------------------------------------------
-SCRIPTS_DIR="$HOME/.config/hypr/scripts/quickshell"
+_QS_THEME=$(cat "$HOME/.config/hypr/.qs_theme" 2>/dev/null || echo "modern")
+SCRIPTS_DIR="$HOME/.config/hypr/scripts/quickshell-${_QS_THEME}"
 SHELL_QML_PATH="$SCRIPTS_DIR/Shell.qml"
 
 # -----------------------------------------------------------------------------
@@ -55,8 +56,10 @@ MANIFEST="$THUMB_DIR/.manifest"
 # -----------------------------------------------------------------------------
 
 if ! pgrep -f "quickshell.*Shell.qml" >/dev/null; then
-    quickshell -p "$SHELL_QML_PATH" >/dev/null 2>&1 &
-    disown
+    systemctl --user start quickshell 2>/dev/null || {
+        quickshell -p "$SHELL_QML_PATH" >/dev/null 2>&1 &
+        disown
+    }
 fi
 
 # -----------------------------------------------------------------------------

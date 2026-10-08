@@ -12,5 +12,4 @@ exec-once = ~/.config/hypr/scripts/settings_watcher.sh &
 exec-once = ~/.config/hypr/scripts/volume_listener.sh
 exec-once = gsettings set org.gnome.desktop.interface cursor-theme 'ArcMidnight-Cursors'
 exec-once = gsettings set org.gnome.desktop.interface cursor-size 36
-exec-once = quickshell -p ~/.config/hypr/scripts/quickshell/Shell.qml
-exec-once = python3 ~/.config/hypr/scripts/quickshell/focustime/focus_daemon.py &
+exec-once = bash -c 'python3 ~/.config/hypr/scripts/quickshell-$(cat ~/.config/hypr/.qs_theme 2>/dev/null || echo modern)/focustime/focus_daemon.py'

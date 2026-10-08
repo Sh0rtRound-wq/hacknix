@@ -42,7 +42,7 @@
             home-manager.useGlobalPkgs       = true;
             home-manager.useUserPackages     = true;
             home-manager.backupFileExtension = "bak";
-            home-manager.extraSpecialArgs    = { inherit wallpaperDir; homeUser = user; inputSensitivity = cfg.inputSensitivity; };
+            home-manager.extraSpecialArgs    = { inherit wallpaperDir; homeUser = user; inputSensitivity = cfg.inputSensitivity; qsTheme = cfg.qsTheme; };
             home-manager.users.${user}       = import ./user.nix;
           }
         ];

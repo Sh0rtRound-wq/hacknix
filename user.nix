@@ -1,4 +1,4 @@
-{ config, pkgs, lib, wallpaperDir, homeUser, inputSensitivity, ... }:
+{ config, pkgs, lib, wallpaperDir, homeUser, inputSensitivity, qsTheme, ... }:
 
 let
   cava-dynamic = pkgs.writeShellScriptBin "cava" ''
@@ -421,6 +421,25 @@ in
     };
   };
 
+  # ── Quickshell systemd user service ───────────────────────────────────
+  systemd.user.services.quickshell = {
+    Unit = {
+      Description = "Quickshell compositor shell";
+      After       = [ "hyprland-session.target" ];
+      PartOf      = [ "graphical-session.target" ];
+    };
+    Service = {
+      Type        = "simple";
+      Environment = "PATH=/run/current-system/sw/bin:/run/wrappers/bin";
+      ExecStart   = "${pkgs.bash}/bin/bash -c 'exec quickshell -p %h/.config/hypr/scripts/quickshell-$(cat %h/.config/hypr/.qs_theme 2>/dev/null || printf modern)/Shell.qml'";
+      Restart     = "always";
+      RestartSec  = "1";
+    };
+    Install = {
+      WantedBy = [ "hyprland-session.target" ];
+    };
+  };
+
   # ── Wallpapers + Scripts ───────────────────────────────────────────────
   home.activation.setupRice = lib.hm.dag.entryAfter ["linkGeneration"] ''
     mkdir -p "$HOME/.config/hypr/config"
@@ -470,5 +489,9 @@ PYEOF
       cp -f "$f" "$HOME/.local/bin/$name"
       chmod +x "$HOME/.local/bin/$name"
     done
+
+    # Write QS theme file — load_info.sh handles live switching
+    mkdir -p "$HOME/.config/hypr"
+    echo "${qsTheme}" > "$HOME/.config/hypr/.qs_theme"
   '';
 }
