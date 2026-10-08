@@ -58,7 +58,7 @@ in
     settings = {
       user.name      = "HackTFTP";
       user.email     = "liamtftp@gmail.com";
-      safe.directory = "/home/${homeUser}/RSFT";
+      safe.directory = "/home/${homeUser}/hacknix";
     };
   };
 
