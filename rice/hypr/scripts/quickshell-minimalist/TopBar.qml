@@ -23,7 +23,7 @@ Variants {
             Scaler { id: scaler; currentWidth: bar.width }
             function s(val) { return scaler.s(val) }
 
-            property int barH: s(22)
+            property int barH: s(30)
             height: barH
             margins { top: 0; bottom: 0; left: 0; right: 0 }
             exclusiveZone: barH
@@ -159,14 +159,14 @@ Variants {
                 // ── LEFT — active workspace square + ws dots ────────────────
                 Row {
                     anchors.left:           parent.left
-                    anchors.leftMargin:     bar.s(8)
+                    anchors.leftMargin:     bar.s(10)
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: bar.s(4)
+                    spacing: bar.s(5)
 
                     // active ws accent square
                     Rectangle {
-                        width:  bar.s(10)
-                        height: bar.s(10)
+                        width:  bar.s(13)
+                        height: bar.s(13)
                         color:  c.mauve
                         radius: 0
                         anchors.verticalCenter: parent.verticalCenter
@@ -176,14 +176,14 @@ Variants {
                     Text {
                         text:           bar.activeWsId
                         font.family:    "JetBrains Mono"
-                        font.pixelSize: bar.s(10)
+                        font.pixelSize: bar.s(13)
                         font.weight:    Font.Bold
                         color:          c.text
                         anchors.verticalCenter: parent.verticalCenter
                     }
 
                     // spacer
-                    Item { width: bar.s(4); height: 1 }
+                    Item { width: bar.s(5); height: 1 }
 
                     // occupied workspace dots (non-active only)
                     Repeater {
@@ -202,15 +202,15 @@ Variants {
                 // ── RIGHT — icons + time ────────────────────────────────────
                 Row {
                     anchors.right:          parent.right
-                    anchors.rightMargin:    bar.s(10)
+                    anchors.rightMargin:    bar.s(12)
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: bar.s(6)
+                    spacing: bar.s(7)
 
                     // net
                     Text {
                         text:           bar.netUp ? "󰤨" : "󰤮"
                         font.family:    "Iosevka Nerd Font"
-                        font.pixelSize: bar.s(11)
+                        font.pixelSize: bar.s(13)
                         color:          Qt.rgba(c.subtext0.r, c.subtext0.g, c.subtext0.b, bar.netUp ? 0.7 : 0.35)
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -219,7 +219,7 @@ Variants {
                     Text {
                         text:           bar.isMuted ? "󰖁" : bar.volIcon
                         font.family:    "Iosevka Nerd Font"
-                        font.pixelSize: bar.s(11)
+                        font.pixelSize: bar.s(13)
                         color:          Qt.rgba(c.subtext0.r, c.subtext0.g, c.subtext0.b, bar.isMuted ? 0.3 : 0.7)
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -229,7 +229,7 @@ Variants {
                         visible:        !bar.isDesktop
                         text:           bar.batIcon
                         font.family:    "Iosevka Nerd Font"
-                        font.pixelSize: bar.s(11)
+                        font.pixelSize: bar.s(13)
                         color: {
                             if (bar.isCharging)   return Qt.rgba(c.mauve.r, c.mauve.g, c.mauve.b, 0.9)
                             if (bar.batCap <= 20) return c.red
@@ -241,7 +241,7 @@ Variants {
                     // divider
                     Rectangle {
                         width:  1
-                        height: bar.s(10)
+                        height: bar.s(13)
                         color:  Qt.rgba(c.overlay0.r, c.overlay0.g, c.overlay0.b, 0.4)
                         anchors.verticalCenter: parent.verticalCenter
                     }
@@ -250,7 +250,7 @@ Variants {
                     Text {
                         text:           bar.timeStr
                         font.family:    "JetBrains Mono"
-                        font.pixelSize: bar.s(10)
+                        font.pixelSize: bar.s(13)
                         font.weight:    Font.Medium
                         color:          Qt.rgba(c.text.r, c.text.g, c.text.b, 0.85)
                         anchors.verticalCenter: parent.verticalCenter
