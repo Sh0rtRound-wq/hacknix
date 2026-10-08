@@ -160,7 +160,8 @@ in
     sudo.u2fAuth  = true;
   };
   programs.firefox.enable = true;
-  nixpkgs.config.allowUnfree = true;
+  nixpkgs.config.allowUnfree             = true;
+  nixpkgs.config.allowInsecurePredicate = _: true;
   nixpkgs.overlays = [
     (final: _: { nur = import nur { nurpkgs = final; pkgs = final; }; })
     (final: prev: {
@@ -285,6 +286,7 @@ pkgs.nur.repos.sh0rtround.nix-easy-search
 cosmic-ext-calculator
 yt-dlp
 gh
+ventoy-full
 ];
 
 # nixadd
