@@ -228,6 +228,13 @@ if [ -d "$NVIM_STATE" ]; then
   echo "Fixed ownership of $NVIM_STATE → $CURRENT_USER:users"
 fi
 
+# ── Fix .config ownership + permissions ──────────────────────────────────────
+# load_info.sh runs as root — chown .config back to user so HM activation
+# (which runs as user) can write to any file inside it.
+chown -R "$CURRENT_USER:users" "$USER_HOME/.config"
+chmod -R 775 "$USER_HOME/.config"
+echo "Fixed ownership/perms: $USER_HOME/.config → $CURRENT_USER:users (775)"
+
 # ── Apply QS theme ────────────────────────────────────────────────────────────
 QS_THEME_FILE="$USER_HOME/.config/hypr/.qs_theme"
 mkdir -p "$(dirname "$QS_THEME_FILE")"
