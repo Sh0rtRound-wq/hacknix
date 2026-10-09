@@ -287,6 +287,7 @@ cosmic-ext-calculator
 yt-dlp
 gh
 ventoy-full
+copyparty
 ];
 
 # nixadd
