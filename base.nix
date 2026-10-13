@@ -367,7 +367,7 @@ copyparty
               else pkgs.ollama;
   };
 
-  services.printing.enable             = true;
+  services.printing.enable             = false;
   programs.dconf.enable                = true;
   virtualisation.libvirtd.enable = true;
   virtualisation.docker.enable   = true;
