@@ -1,4 +1,4 @@
-{ config, pkgs, lib, wallpaperDir, homeUser, inputSensitivity, qsTheme, ... }:
+{ config, pkgs, lib, wallpaperDir, homeUser, mouseSensitivity, touchpadSensitivity, qsTheme, ... }:
 
 let
   cava-dynamic = pkgs.writeShellScriptBin "cava" ''
@@ -461,7 +461,8 @@ try:
 except Exception:
     d = {}
 
-d["inputSensitivity"] = "${inputSensitivity}"
+d["mouseSensitivity"]    = "${mouseSensitivity}"
+d["touchpadSensitivity"] = "${touchpadSensitivity}"
 
 defaults = {
     "wallpaperDir":       "${wallpaperDir}",
@@ -482,6 +483,17 @@ with open(f, "w") as fh:
 PYEOF
 
     bash "$HOME/.config/hypr/scripts/settings_watcher.sh" --compile 2>/dev/null || true
+
+    # Force Hyprland reload — HYPRLAND_INSTANCE_SIGNATURE isn't set in activation context
+    # so hyprctl inside settings_watcher silently fails. Enumerate the socket dir instead.
+    _hypr_sock_dir="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr"
+    if [ -d "$_hypr_sock_dir" ]; then
+      for _inst_dir in "$_hypr_sock_dir"/*/; do
+        [ -d "$_inst_dir" ] || continue
+        _inst=$(basename "$_inst_dir")
+        HYPRLAND_INSTANCE_SIGNATURE="$_inst" hyprctl reload 2>/dev/null && break
+      done
+    fi
 
     mkdir -p "$HOME/.local/bin"
     for f in ${./rice/scripts}/*.sh; do

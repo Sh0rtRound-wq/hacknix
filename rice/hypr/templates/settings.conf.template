@@ -34,12 +34,12 @@ input {
     kb_model =
     kb_rules =
     accel_profile = flat
-    sensitivity = {{INPUT_SENSITIVITY}}
+    sensitivity = {{MOUSE_SENSITIVITY}}
 }
 
 device {
     name = .*touchpad.*
-    sensitivity = {{INPUT_SENSITIVITY}}
+    sensitivity = {{TOUCHPAD_SENSITIVITY}}
     natural_scroll = false
 }
 

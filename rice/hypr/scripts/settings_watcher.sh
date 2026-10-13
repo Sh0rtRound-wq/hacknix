@@ -33,7 +33,8 @@ compile_settings() {
     # Read state from JSON (Using 'has' to safely parse booleans)
     LANG=$(jq -r '.language // "us"' "$SETTINGS_FILE")
     KB_OPT=$(jq -r '.kbOptions // "grp:alt_shift_toggle"' "$SETTINGS_FILE")
-    INPUT_SENSITIVITY=$(jq -r '.inputSensitivity // "-0.1"' "$SETTINGS_FILE")
+    MOUSE_SENSITIVITY=$(jq -r '.mouseSensitivity // "-0.1"' "$SETTINGS_FILE")
+    TOUCHPAD_SENSITIVITY=$(jq -r '.touchpadSensitivity // "0.8"' "$SETTINGS_FILE")
     WP_DIR=$(jq -r '.wallpaperDir // empty' "$SETTINGS_FILE")
 
     # Safely parse booleans so "false" doesn't trigger a fallback
@@ -72,7 +73,8 @@ compile_settings() {
     echo "Regenerating settings.conf..."
     sed -e "s|{{KB_LAYOUT}}|$LANG|g" \
         -e "s|{{KB_OPTIONS}}|$KB_OPT|g" \
-        -e "s|{{INPUT_SENSITIVITY}}|$INPUT_SENSITIVITY|g" \
+        -e "s|{{MOUSE_SENSITIVITY}}|$MOUSE_SENSITIVITY|g" \
+        -e "s|{{TOUCHPAD_SENSITIVITY}}|$TOUCHPAD_SENSITIVITY|g" \
         "$TMPL_DIR/settings.conf.template" > "$SETTINGS_CONF"
 
     # 3. Regenerate autostart.conf

@@ -25,8 +25,9 @@ if [[ "${1:-}" == "--stub" ]]; then
   nvidiaBusId      = "";
   amdBusId         = "";
   intelBusId       = "";
-  inputSensitivity = "-0.1";
-  qsTheme          = "modern";
+  mouseSensitivity    = "-0.1";
+  touchpadSensitivity = "0.8";
+  qsTheme             = "modern";
 }
 NIXEOF
   cat > "$HW_DST" <<'NIXEOF'
@@ -78,10 +79,14 @@ fi
 CURRENT_POWER="balanced"
 
 CURRENT_QS_THEME="modern"
+CURRENT_MOUSE_SENSITIVITY="-0.1"
+CURRENT_TOUCHPAD_SENSITIVITY="0.8"
 if [ -f "$CONFIG" ] && ! grep -q "# Stub" "$CONFIG"; then
-  u=$(nix_str "user"         "$CONFIG"); [ -n "$u" ] && CURRENT_USER="$u"
-  p=$(nix_str "powerProfile" "$CONFIG"); [ -n "$p" ] && CURRENT_POWER="$p"
-  q=$(nix_str "qsTheme"      "$CONFIG"); [ -n "$q" ] && CURRENT_QS_THEME="$q"
+  u=$(nix_str "user"               "$CONFIG"); [ -n "$u" ] && CURRENT_USER="$u"
+  p=$(nix_str "powerProfile"       "$CONFIG"); [ -n "$p" ] && CURRENT_POWER="$p"
+  q=$(nix_str "qsTheme"            "$CONFIG"); [ -n "$q" ] && CURRENT_QS_THEME="$q"
+  m=$(nix_str "mouseSensitivity"   "$CONFIG"); [ -n "$m" ] && CURRENT_MOUSE_SENSITIVITY="$m"
+  t=$(nix_str "touchpadSensitivity" "$CONFIG"); [ -n "$t" ] && CURRENT_TOUCHPAD_SENSITIVITY="$t"
 fi
 
 # ── Detect hardware ───────────────────────────────────────────────────────────
@@ -128,16 +133,6 @@ else
   GPU_MODE="amd"
 fi
 
-# ── Detect input device type ──────────────────────────────────────────────────
-
-if grep -qi 'touchpad\|trackpad\|clickpad' /proc/bus/input/devices 2>/dev/null; then
-  INPUT_DEVICE="touchpad"
-  INPUT_SENSITIVITY="0.8"
-else
-  INPUT_DEVICE="mouse"
-  INPUT_SENSITIVITY="-0.1"
-fi
-
 # ── Preview & confirm ─────────────────────────────────────────────────────────
 
 echo ""
@@ -150,7 +145,8 @@ echo "  gpu mode:    $GPU_MODE"
 [ -n "$NVIDIA_BUS" ] && echo "  nvidia bus:  $NVIDIA_BUS"
 [ -n "$AMD_BUS"    ] && echo "  amd bus:     $AMD_BUS"
 [ -n "$INTEL_BUS"  ] && echo "  intel bus:   $INTEL_BUS"
-echo "  input:       $INPUT_DEVICE (sensitivity: $INPUT_SENSITIVITY)"
+echo "  mouse sens:    $CURRENT_MOUSE_SENSITIVITY"
+echo "  touchpad sens: $CURRENT_TOUCHPAD_SENSITIVITY"
 echo "  qs theme:    $CURRENT_QS_THEME"
 echo ""
 printf "Write to config.nix? [Y/n] "
@@ -174,8 +170,9 @@ cat > "$CONFIG" <<NIXEOF
   nvidiaBusId      = "$NVIDIA_BUS";      # only for prime modes, e.g. "PCI:196:0:0"
   amdBusId         = "$AMD_BUS";         # only for prime-nvidia-amd, e.g. "PCI:197:0:0"
   intelBusId       = "$INTEL_BUS";       # only for prime-nvidia-intel, e.g. "PCI:0:2:0"
-  inputSensitivity = "$INPUT_SENSITIVITY"; # "0.8" for touchpad, "-0.1" for mouse
-  qsTheme          = "$CURRENT_QS_THEME";  # "modern" or "minimalist"
+  mouseSensitivity    = "$CURRENT_MOUSE_SENSITIVITY"; # sensitivity for mice / pointer devices
+  touchpadSensitivity = "$CURRENT_TOUCHPAD_SENSITIVITY";  # sensitivity for touchpads (ignored on desktops)
+  qsTheme             = "$CURRENT_QS_THEME";  # "modern" or "minimalist"
 }
 NIXEOF
 
@@ -243,4 +240,19 @@ echo "QS theme set to: $CURRENT_QS_THEME"
 # If QS is running, kill it — systemd Restart=always or qs_manager watchdog relaunches it
 if pkill -f "quickshell.*Shell.qml" 2>/dev/null; then
   echo "Quickshell restarted with theme: $CURRENT_QS_THEME"
+fi
+
+# ── Apply input sensitivity live ──────────────────────────────────────────────
+# Write values into settings.json and recompile Hyprland configs immediately.
+# Without this, speed only takes effect after nixos-rebuild (activation hook).
+USER_SETTINGS_JSON="$USER_HOME/.config/hypr/settings.json"
+if [ -f "$USER_SETTINGS_JSON" ]; then
+  TMP=$(mktemp)
+  jq --arg ms "$CURRENT_MOUSE_SENSITIVITY" \
+     --arg ts "$CURRENT_TOUCHPAD_SENSITIVITY" \
+     '.mouseSensitivity = $ms | .touchpadSensitivity = $ts' \
+     "$USER_SETTINGS_JSON" > "$TMP" && mv "$TMP" "$USER_SETTINGS_JSON"
+  chown "$CURRENT_USER:" "$USER_SETTINGS_JSON"
+  chmod 644 "$USER_SETTINGS_JSON"
+  echo "Input sensitivity written to settings.json (mouse: $CURRENT_MOUSE_SENSITIVITY, touchpad: $CURRENT_TOUCHPAD_SENSITIVITY)"
 fi

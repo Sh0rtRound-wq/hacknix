@@ -32,7 +32,8 @@
           nvidiaBusId      = cfg.nvidiaBusId;
           amdBusId         = cfg.amdBusId;
           intelBusId       = cfg.intelBusId;
-          inputSensitivity = cfg.inputSensitivity;
+          mouseSensitivity    = cfg.mouseSensitivity;
+          touchpadSensitivity = cfg.touchpadSensitivity;
         };
         modules = [
           ./base.nix
@@ -42,7 +43,7 @@
             home-manager.useGlobalPkgs       = true;
             home-manager.useUserPackages     = true;
             home-manager.backupFileExtension = "bak";
-            home-manager.extraSpecialArgs    = { inherit wallpaperDir; homeUser = user; inputSensitivity = cfg.inputSensitivity; qsTheme = cfg.qsTheme; };
+            home-manager.extraSpecialArgs    = { inherit wallpaperDir; homeUser = user; mouseSensitivity = cfg.mouseSensitivity; touchpadSensitivity = cfg.touchpadSensitivity; qsTheme = cfg.qsTheme; };
             home-manager.users.${user}       = import ./user.nix;
           }
         ];
