@@ -288,6 +288,7 @@ yt-dlp
 gh
 ventoy-full
 copyparty
+exfatprogs
 ];
 
 # nixadd
