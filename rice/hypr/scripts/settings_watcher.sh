@@ -35,6 +35,18 @@ compile_settings() {
     KB_OPT=$(jq -r '.kbOptions // "grp:alt_shift_toggle"' "$SETTINGS_FILE")
     MOUSE_SENSITIVITY=$(jq -r '.mouseSensitivity // "-0.1"' "$SETTINGS_FILE")
     TOUCHPAD_SENSITIVITY=$(jq -r '.touchpadSensitivity // "0.8"' "$SETTINGS_FILE")
+    _TOUCHPAD_STORED=$(jq -r '.touchpadMouseDevice // "none"' "$SETTINGS_FILE")
+    if [ "$_TOUCHPAD_STORED" = "none" ]; then
+        TOUCHPAD_MOUSE_DEV="none"
+        TOUCHPAD_DEV="none"
+    else
+        # Strip any trailing -mouse or -touchpad suffix (handles any variant stored)
+        # to get the base device name, then derive both wlroots variants.
+        # Hyprland silently ignores device blocks with non-matching names.
+        _TD_BASE=$(echo "$_TOUCHPAD_STORED" | sed 's/-mouse$//;s/-touchpad$//')
+        TOUCHPAD_MOUSE_DEV="${_TD_BASE}-mouse"
+        TOUCHPAD_DEV="${_TD_BASE}-touchpad"
+    fi
     WP_DIR=$(jq -r '.wallpaperDir // empty' "$SETTINGS_FILE")
 
     # Safely parse booleans so "false" doesn't trigger a fallback
@@ -75,6 +87,8 @@ compile_settings() {
         -e "s|{{KB_OPTIONS}}|$KB_OPT|g" \
         -e "s|{{MOUSE_SENSITIVITY}}|$MOUSE_SENSITIVITY|g" \
         -e "s|{{TOUCHPAD_SENSITIVITY}}|$TOUCHPAD_SENSITIVITY|g" \
+        -e "s|{{TOUCHPAD_MOUSE_DEV}}|$TOUCHPAD_MOUSE_DEV|g" \
+        -e "s|{{TOUCHPAD_DEV}}|$TOUCHPAD_DEV|g" \
         "$TMPL_DIR/settings.conf.template" > "$SETTINGS_CONF"
 
     # 3. Regenerate autostart.conf

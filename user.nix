@@ -463,6 +463,9 @@ except Exception:
 
 d["mouseSensitivity"]    = "${mouseSensitivity}"
 d["touchpadSensitivity"] = "${touchpadSensitivity}"
+# touchpadMouseDevice is written by load_info.sh — only set default if missing
+if "touchpadMouseDevice" not in d:
+    d["touchpadMouseDevice"] = "none"
 
 defaults = {
     "wallpaperDir":       "${wallpaperDir}",
@@ -482,7 +485,7 @@ with open(f, "w") as fh:
     json.dump(d, fh, indent=2)
 PYEOF
 
-    bash "$HOME/.config/hypr/scripts/settings_watcher.sh" --compile 2>/dev/null || true
+    bash "$HOME/.config/hypr/scripts/settings_watcher.sh" --compile || true
 
     # Force Hyprland reload — HYPRLAND_INSTANCE_SIGNATURE isn't set in activation context
     # so hyprctl inside settings_watcher silently fails. Enumerate the socket dir instead.

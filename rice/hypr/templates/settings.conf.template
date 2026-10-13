@@ -37,9 +37,22 @@ input {
     sensitivity = {{MOUSE_SENSITIVITY}}
 }
 
+# Touchpad sensitivity overrides — covers both wlroots device variants:
+# -mouse  (relative pointer device — cursor movement on some setups)
+# -touchpad (main touchpad device — cursor movement on other setups)
+# Whichever controls the cursor on this machine will pick up the override.
+# The non-matching block is silently ignored by Hyprland.
 device {
-    name = .*touchpad.*
+    name = {{TOUCHPAD_MOUSE_DEV}}
     sensitivity = {{TOUCHPAD_SENSITIVITY}}
+    accel_profile = flat
+    natural_scroll = false
+}
+
+device {
+    name = {{TOUCHPAD_DEV}}
+    sensitivity = {{TOUCHPAD_SENSITIVITY}}
+    accel_profile = flat
     natural_scroll = false
 }
 

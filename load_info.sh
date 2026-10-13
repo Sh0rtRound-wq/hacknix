@@ -133,6 +133,23 @@ else
   GPU_MODE="amd"
 fi
 
+# ── Detect touchpad device name (Hyprland format) ────────────────────────────
+# Finds the touchpad in /proc/bus/input/devices, converts to Hyprland's
+# lowercase-hyphenated format, then derives the -mouse variant that handles
+# actual cursor movement. Written to settings.json so the device{} block in
+# settings.conf.template can use the exact name.
+
+TOUCHPAD_MOUSE_DEV="none"
+TOUCHPAD_RAW=$(grep -iE '^N: Name=.*(touchpad|trackpad|clickpad)' \
+  /proc/bus/input/devices 2>/dev/null | head -1 | sed 's/N: Name="//;s/"//' || true)
+
+if [ -n "$TOUCHPAD_RAW" ]; then
+  # Convert to Hyprland format: lowercase, spaces→hyphens
+  # Store the raw converted name — settings_watcher.sh derives both -mouse and -touchpad
+  # variants from this by stripping any suffix and re-appending both.
+  TOUCHPAD_MOUSE_DEV=$(echo "$TOUCHPAD_RAW" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+fi
+
 # ── Preview & confirm ─────────────────────────────────────────────────────────
 
 echo ""
@@ -145,9 +162,10 @@ echo "  gpu mode:    $GPU_MODE"
 [ -n "$NVIDIA_BUS" ] && echo "  nvidia bus:  $NVIDIA_BUS"
 [ -n "$AMD_BUS"    ] && echo "  amd bus:     $AMD_BUS"
 [ -n "$INTEL_BUS"  ] && echo "  intel bus:   $INTEL_BUS"
-echo "  mouse sens:    $CURRENT_MOUSE_SENSITIVITY"
-echo "  touchpad sens: $CURRENT_TOUCHPAD_SENSITIVITY"
-echo "  qs theme:    $CURRENT_QS_THEME"
+echo "  mouse sens:      $CURRENT_MOUSE_SENSITIVITY"
+echo "  touchpad sens:   $CURRENT_TOUCHPAD_SENSITIVITY"
+echo "  touchpad device: $TOUCHPAD_MOUSE_DEV  (both -mouse and -touchpad variants targeted)"
+echo "  qs theme:        $CURRENT_QS_THEME"
 echo ""
 printf "Write to config.nix? [Y/n] "
 read -r CONFIRM
@@ -250,9 +268,28 @@ if [ -f "$USER_SETTINGS_JSON" ]; then
   TMP=$(mktemp)
   jq --arg ms "$CURRENT_MOUSE_SENSITIVITY" \
      --arg ts "$CURRENT_TOUCHPAD_SENSITIVITY" \
-     '.mouseSensitivity = $ms | .touchpadSensitivity = $ts' \
+     --arg td "$TOUCHPAD_MOUSE_DEV" \
+     '.mouseSensitivity = $ms | .touchpadSensitivity = $ts | .touchpadMouseDevice = $td' \
      "$USER_SETTINGS_JSON" > "$TMP" && mv "$TMP" "$USER_SETTINGS_JSON"
   chown "$CURRENT_USER:" "$USER_SETTINGS_JSON"
   chmod 644 "$USER_SETTINGS_JSON"
-  echo "Input sensitivity written to settings.json (mouse: $CURRENT_MOUSE_SENSITIVITY, touchpad: $CURRENT_TOUCHPAD_SENSITIVITY)"
+  echo "Input sensitivity written to settings.json (mouse: $CURRENT_MOUSE_SENSITIVITY, touchpad: $CURRENT_TOUCHPAD_SENSITIVITY, device: $TOUCHPAD_MOUSE_DEV)"
+
+  # Immediately recompile Hyprland configs and reload — don't wait for inotify watcher
+  WATCHER_SCRIPT="$USER_HOME/.config/hypr/scripts/settings_watcher.sh"
+  if [ -f "$WATCHER_SCRIPT" ]; then
+    sudo -u "$CURRENT_USER" bash "$WATCHER_SCRIPT" --compile
+    echo "Hyprland configs recompiled."
+  fi
+
+  # Reload Hyprland — enumerate sockets since HYPRLAND_INSTANCE_SIGNATURE may not be set
+  _hypr_sock_dir="/run/user/$(id -u "$CURRENT_USER")/hypr"
+  if [ -d "$_hypr_sock_dir" ]; then
+    for _inst_dir in "$_hypr_sock_dir"/*/; do
+      [ -d "$_inst_dir" ] || continue
+      _inst=$(basename "$_inst_dir")
+      sudo -u "$CURRENT_USER" env HYPRLAND_INSTANCE_SIGNATURE="$_inst" hyprctl reload 2>/dev/null && \
+        echo "Hyprland reloaded (instance: $_inst)" && break
+    done
+  fi
 fi
