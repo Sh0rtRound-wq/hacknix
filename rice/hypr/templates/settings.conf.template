@@ -4,8 +4,8 @@
 
 general {
     border_size = 4
-    gaps_in = 1
-    gaps_out = 4
+    gaps_in = 4
+    gaps_out = 8
     resize_on_border = true
     extend_border_grab_area = 30
     col.active_border = $active_border

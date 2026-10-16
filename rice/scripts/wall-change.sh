@@ -11,5 +11,5 @@ else
     awww img --transition-type="$random_animation" "$1" &
 fi
 
-matugen image --source-color-index 0 "$1"
+matugen image --type scheme-vibrant --contrast 1.0 --source-color-index 0 "$1"
 bash "$HOME/.config/hypr/scripts/quickshell/wallpaper/matugen_reload.sh"

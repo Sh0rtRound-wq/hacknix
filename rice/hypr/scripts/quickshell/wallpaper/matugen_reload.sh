@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# Deepen accent colors post-matugen
+python3 "${HOME}/.config/hypr/scripts/deepen-colors.py"
+# Reload Hyprland borders
+sig=$(ls /run/user/1000/hypr/ 2>/dev/null | head -1)
+[ -n "$sig" ] && XDG_RUNTIME_DIR=/run/user/1000 HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl reload &
+
+
 # Boost terminal colors to neon/vivid variants (kitty only)
 bash "${HOME}/.config/hypr/scripts/quickshell/wallpaper/boost-kitty-colors.sh"
 

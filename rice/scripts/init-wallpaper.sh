@@ -31,4 +31,4 @@ WALLPAPER="$(cat "$WALLPAPER_FILE")"
 $SWWW img --transition-type none "$WALLPAPER"
 
 # Generate color theme from wallpaper
-$MATUGEN image --source-color-index 0 "$WALLPAPER"
+$MATUGEN image --type scheme-vibrant --contrast 1.0 --source-color-index 0 "$WALLPAPER"
