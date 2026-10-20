@@ -23,9 +23,7 @@ Variants {
             // =========================================================
             // --- FULL SCREEN LAYOUT & TOPBAR CLEARANCE
             // =========================================================
-            anchors {
-                top: false; bottom: true; left: true; right: true
-            }
+            anchors.top: false; anchors.bottom: true; anchors.left: true; anchors.right: true
             implicitHeight: floatingWidget.screen.height - 60
 
             // =========================================================
@@ -668,7 +666,7 @@ Variants {
                 // 10px smaller on each side = 20px total subtraction
                 width: floatingWidget.activeEdge === "bottom" ? Math.max(floatingWidget.s(20), floatingWidget.baseSidebarH - floatingWidget.s(20)) : floatingWidget.s(12)
                 height: floatingWidget.activeEdge === "bottom" ? floatingWidget.s(12) : Math.max(floatingWidget.s(20), floatingWidget.baseSidebarH - floatingWidget.s(20))
-                radius: 0
+                radius: floatingWidget.s(6)
                 
                 color: Qt.rgba(mocha.base.r, mocha.base.g, mocha.base.b, 1.0)
                 border.width: 0
@@ -718,7 +716,7 @@ Variants {
                     anchors.centerIn: parent
                     width: floatingWidget.activeEdge === "bottom" ? floatingWidget.s(30) : floatingWidget.s(4)
                     height: floatingWidget.activeEdge === "bottom" ? floatingWidget.s(4) : floatingWidget.s(30)
-                    radius: 1
+                    radius: floatingWidget.s(2)
                     color: Qt.darker(mocha.mauve, 1.8)
                 }
 
@@ -828,7 +826,7 @@ Variants {
                         y: 0
                         width: floatingWidget.s(15) + parent.width
                         height: parent.height
-                        radius: 0 
+                        radius: floatingWidget.s(15) 
                         color: Qt.rgba(mocha.base.r, mocha.base.g, mocha.base.b, 0.95) 
                         border.width: 1
                         border.color: Qt.rgba(mocha.text.r, mocha.text.g, mocha.text.b, 0.08)
@@ -870,7 +868,7 @@ Variants {
                         clip: true 
 
                         component EmptyBlock : Rectangle {
-                            radius: 0 
+                            radius: floatingWidget.s(12) 
                             color: Qt.rgba(mocha.text.r, mocha.text.g, mocha.text.b, 0.05)
                             border.width: 1
                             border.color: Qt.rgba(mocha.text.r, mocha.text.g, mocha.text.b, 0.08)
@@ -1175,7 +1173,7 @@ Variants {
                                 x: 0
                                 width: parent.width
                                 z: 0
-                                radius: 0 
+                                radius: floatingWidget.s(7) 
                                 color: mocha.mauve
 
                                 property int prevIdx: 0
@@ -1210,7 +1208,7 @@ Variants {
                                     
                                     x: 0
                                     width: parent.width
-                                    radius: 0 
+                                    radius: floatingWidget.s(7) 
                                     z: 1 
 
                                     y: floatingWidget.barOffsetY + floatingWidget.getTargetY(index, floatingWidget.activeIndex)

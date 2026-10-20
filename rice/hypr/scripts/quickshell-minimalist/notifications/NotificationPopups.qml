@@ -41,11 +41,8 @@ PanelWindow {
     WlrLayershell.namespace: "qs-popups"
     WlrLayershell.layer: WlrLayer.Overlay
 
-    anchors {
-        top: true
-        right: true
-    }
-
+    anchors.top: true
+        anchors.right: true
     margins {
         top: popupWindow.layoutConfig.marginTop
         right: popupWindow.layoutConfig.marginRight

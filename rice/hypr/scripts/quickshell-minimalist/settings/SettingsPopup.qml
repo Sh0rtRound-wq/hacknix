@@ -1,6 +1,4 @@
 import QtQuick
-import QtQuick.Window
-import QtQuick.Effects
 import QtQuick.Layouts
 import QtQuick.Controls
 import Quickshell
@@ -11,23 +9,21 @@ Item {
     id: root
     focus: true
 
-    Scaler {
-        id: scaler
-        currentWidth: Screen.width
-    }
-    function s(val) { 
-        return scaler.s(val); 
-    }
-    
-    property bool isLayoutDropdownOpen: false
+    // identity — no scaling
+    function s(val) { return val; }
 
+    // ── PASSTHROUGH PROPS (Main.qml compat) ───────────────────────────────────
+    property var  notifModel
+    property var  liveNotifs
+    property real layoutWidth:  0
+    property real layoutHeight: 0
+
+    // ── STATE ─────────────────────────────────────────────────────────────────
+    property bool isLayoutDropdownOpen: false
     property bool isSearchMode: false
     property string globalSearchQuery: ""
-
     property int highlightedBox: -1
-
     property int searchHighlightIndex: -1
-
     property var searchResultItems: []
 
     function rebuildSearchResultItems() {
@@ -237,7 +233,8 @@ Item {
             root.clearHighlight();
             event.accepted = true;
         } else {
-            closeSequence.start();
+            Quickshell.execDetached(["hyprctl", "dispatch", "submap", "reset"]);
+            Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "close"]);
             event.accepted = true;
         }
     }
@@ -254,7 +251,7 @@ Item {
     }
 
     Keys.onPressed: (event) => {
-        if ((event.key === Qt.Key_F && (event.modifiers & Qt.ControlModifier)) || 
+        if ((event.key === Qt.Key_F && (event.modifiers & Qt.ControlModifier)) ||
             (event.key === Qt.Key_Slash && !root.isSearchMode)) {
             root.isSearchMode = true;
             globalSearchInput.forceActiveFocus();
@@ -299,7 +296,7 @@ Item {
             }
             return;
         }
-        
+
         if (event.key === Qt.Key_Left) {
             if (root.currentTab === 0 && root.highlightedBox === 2) {
                 Config.uiScale = Math.max(0.5, (Config.uiScale - 0.1).toFixed(1));
@@ -420,28 +417,34 @@ Item {
         }
     }
 
+    // ── MATUGEN COLORS ────────────────────────────────────────────────────────
     MatugenColors { id: _theme }
 
-    readonly property color base: _theme.base
-    readonly property color mantle: _theme.mantle
-    readonly property color crust: _theme.crust
-    readonly property color text: _theme.text
-    readonly property color subtext0: _theme.subtext0
-    readonly property color subtext1: _theme.subtext1
-    readonly property color surface0: _theme.surface0
-    readonly property color surface1: _theme.surface1
-    readonly property color surface2: _theme.surface2
-    readonly property color overlay0: _theme.overlay0
-    readonly property color mauve: _theme.mauve
-    readonly property color pink: _theme.pink
-    readonly property color blue: _theme.blue
-    readonly property color sapphire: _theme.sapphire
-    readonly property color teal: _theme.teal
-    readonly property color green: _theme.green
-    readonly property color peach: _theme.peach
-    readonly property color yellow: _theme.yellow
-    readonly property color red: _theme.red
+    readonly property color base:      _theme.base
+    readonly property color mantle:    _theme.mantle
+    readonly property color crust:     _theme.crust
+    readonly property color text:      _theme.text
+    readonly property color subtext0:  _theme.subtext0
+    readonly property color subtext1:  _theme.subtext1
+    readonly property color surface0:  _theme.surface0
+    readonly property color surface1:  _theme.surface1
+    readonly property color surface2:  _theme.surface2
+    readonly property color overlay0:  _theme.overlay0
+    readonly property color mauve:     _theme.mauve
+    readonly property color pink:      _theme.pink
+    readonly property color blue:      _theme.blue
+    readonly property color sapphire:  _theme.sapphire
+    readonly property color teal:      _theme.teal
+    readonly property color green:     _theme.green
+    readonly property color peach:     _theme.peach
+    readonly property color yellow:    _theme.yellow
+    readonly property color red:       _theme.red
+    // aliases for colors not in MatugenColors
+    readonly property color sky:       _theme.sapphire
+    readonly property color lavender:  _theme.mauve
+    readonly property color flamingo:  _theme.pink
 
+    // ── KEYBOARD LAYOUT TOGGLE OPTIONS ────────────────────────────────────────
     property var kbToggleModelArr: [
         { label: "Alt + Shift", val: "grp:alt_shift_toggle" },
         { label: "Win + Space", val: "grp:win_space_toggle" },
@@ -459,11 +462,11 @@ Item {
         return "Alt + Shift";
     }
 
+    // ── KEYBINDS MODEL ────────────────────────────────────────────────────────
     ListModel { id: dynamicKeybindsModel }
-    
+
     Connections {
         target: Config
-        // Triggers the very first time Config finishes reading the JSON
         function onKeybindsLoaded() {
             dynamicKeybindsModel.clear();
             for (let i = 0; i < Config.keybindsData.length; i++) {
@@ -478,7 +481,6 @@ Item {
                 });
             }
         }
-        // Triggers whenever you save and Config.keybindsData is overwritten
         function onKeybindsDataChanged() {
             dynamicKeybindsModel.clear();
             for (let i = 0; i < Config.keybindsData.length; i++) {
@@ -506,6 +508,7 @@ Item {
             }
         }
     }
+
     property var bindTypes: ["bind", "binde", "bindl", "bindel", "bindm"]
     property var dispatchers: ["exec", "exec-once", "dispatch", "workspace", "movetoworkspace", "movewindow", "resizeactive", "movefocus", "togglefloating", "killactive"]
 
@@ -513,14 +516,14 @@ Item {
         let bindsArray = [];
         for (let i = 0; i < dynamicKeybindsModel.count; i++) {
             let item = dynamicKeybindsModel.get(i);
-            if (!item.key && !item.command) continue; 
+            if (!item.key && !item.command) continue;
             bindsArray.push({
                 type: item.type,
                 mods: item.mods,
                 key: item.key,
                 dispatcher: item.dispatcher,
                 command: item.command,
-                isEditing: false // CRITICAL: This prevents QML from dropping the role!
+                isEditing: false
             });
         }
         Config.saveAllKeybinds(bindsArray);
@@ -529,7 +532,7 @@ Item {
     function validateKeybind(index, mods, key, dispatcher, command) {
         let validMods = ["SHIFT", "SHIFT_L", "SHIFT_R", "CAPS", "CTRL", "CONTROL", "ALT", "MOD2", "MOD3", "SUPER", "WIN", "LOGO", "MOD4", "MOD5", "$mainMod"];
         let modArray = mods ? mods.replace(/&/g, " ").split(" ").filter(x => x !== "") : [];
-        
+
         for (let i = 0; i < modArray.length; i++) {
             if (!validMods.includes(modArray[i])) {
                 return "Invalid modifier: " + modArray[i] + ".\nKeys like SPACE cannot be used as modifiers.";
@@ -541,13 +544,10 @@ Item {
 
         for (let i = 0; i < dynamicKeybindsModel.count; i++) {
             if (i === index) continue;
-
             let item = dynamicKeybindsModel.get(i);
             if (!item.key) continue;
-
             let itemModsNormalized = item.mods ? item.mods.replace(/&/g, " ").split(" ").filter(x => x !== "").sort().join(" ") : "";
             let itemKeyNormalized = item.key.trim().toLowerCase();
-
             if (itemModsNormalized === currentModsNormalized && itemKeyNormalized === currentKeyNormalized) {
                 return "Duplicate keybind!\nThis exact combination already exists.";
             }
@@ -556,6 +556,7 @@ Item {
         return "VALID";
     }
 
+    // ── STARTUP MODEL ─────────────────────────────────────────────────────────
     ListModel { id: dynamicStartupModel }
 
     Connections {
@@ -583,24 +584,17 @@ Item {
         Config.saveAllStartup(startupArray);
     }
 
+    // ── TIMERS ────────────────────────────────────────────────────────────────
     Timer {
         id: scrollTimer
         interval: 50
-        onTriggered: {
-            if (keybindLoader.item) {
-                keybindLoader.item.scrollToBottom();
-            }
-        }
+        onTriggered: { if (keybindLoader.item) keybindLoader.item.scrollToBottom(); }
     }
 
     Timer {
         id: startupScrollTimer
         interval: 50
-        onTriggered: {
-            if (startupLoader.item) {
-                startupLoader.item.scrollToBottom();
-            }
-        }
+        onTriggered: { if (startupLoader.item) startupLoader.item.scrollToBottom(); }
     }
 
     Timer {
@@ -612,9 +606,7 @@ Item {
         onTriggered: {
             if (targetBox >= 0) {
                 root.highlightedBox = targetBox;
-                
                 let approxY = 0;
-
                 if (targetTab === 0 && generalLoader.item) {
                     if (targetBox === 0 || targetBox === 1) approxY = 0;
                     else if (targetBox === 2) approxY = root.s(120);
@@ -634,12 +626,12 @@ Item {
                     approxY = targetBox * (root.s(56)) + root.s(20);
                     startupLoader.item.scrollTo(approxY);
                 }
-
                 targetBox = -1;
             }
         }
-    }    
+    }
 
+    // ── LANGUAGE MODEL ────────────────────────────────────────────────────────
     ListModel {
         id: langModel
 
@@ -736,8 +728,8 @@ Item {
         ListElement { code: "os"; name: "Ossetian" }
         ListElement { code: "udm"; name: "Udmurt" }
         ListElement { code: "kbd"; name: "Kabardian" }
-	ListElement { code: "che"; name: "Chechen" }
-	ListElement { code: "tr"; name: "Turkish" }
+        ListElement { code: "che"; name: "Chechen" }
+        ListElement { code: "tr"; name: "Turkish" }
 
         // --- Asia & Pacific ---
         ListElement { code: "au"; name: "English (Australia)" }
@@ -859,6 +851,7 @@ Item {
         }
     }
 
+    // ── PATH SUGGEST PROCESS ──────────────────────────────────────────────────
     Process {
         id: pathSuggestProc
         property string query: ""
@@ -880,17 +873,18 @@ Item {
         }
     }
 
+    // ── ALL SETTINGS CARDS (search index) ────────────────────────────────────
     property var allSettingsCards: [
-        { tab: 0, boxIndex: 0, label: "Guide on startup",  desc: "Launch on login",        icon: "󰑊", color: "peach" },
-        { tab: 0, boxIndex: 1, label: "Help icon",         desc: "Show button in topbar",  icon: "󰋖", color: "blue" },
-        { tab: 0, boxIndex: 2, label: "UI Scale",          desc: "Base size scalar",       icon: "󰁦", color: "sapphire" },
-        { tab: 0, boxIndex: 3, label: "Keyboard layouts",  desc: "Matches hyprland.conf",  icon: "󰌌", color: "green" },
-        { tab: 0, boxIndex: 4, label: "Layout shortcut",   desc: "Toggle combination",     icon: "󰯍", color: "teal" },
-        { tab: 0, boxIndex: 5, label: "Wallpaper directory",desc: "Absolute source path",  icon: "󰋩", color: "mauve" },
-        { tab: 0, boxIndex: 6, label: "Workspaces",        desc: "Static count in topbar", icon: "󰽿", color: "red" },
-        { tab: 1, boxIndex: 1, label: "API Key",           desc: "OpenWeather API key",    icon: "󰌆", color: "blue" },
-        { tab: 1, boxIndex: 2, label: "City ID",           desc: "OpenWeather city ID",    icon: "󰖐", color: "blue" },
-        { tab: 1, boxIndex: 3, label: "Temperature Unit",  desc: "Celsius / Fahrenheit / K", icon: "󰔄", color: "blue" }
+        { tab: 0, boxIndex: 0, label: "Guide on startup",   desc: "Launch on login",          icon: "󰑊", color: "peach" },
+        { tab: 0, boxIndex: 1, label: "Help icon",          desc: "Show button in topbar",     icon: "󰋖", color: "blue" },
+        { tab: 0, boxIndex: 2, label: "UI Scale",           desc: "Base size scalar",          icon: "󰁦", color: "sapphire" },
+        { tab: 0, boxIndex: 3, label: "Keyboard layouts",   desc: "Matches hyprland.conf",     icon: "󰌌", color: "green" },
+        { tab: 0, boxIndex: 4, label: "Layout shortcut",    desc: "Toggle combination",        icon: "󰯍", color: "teal" },
+        { tab: 0, boxIndex: 5, label: "Wallpaper directory",desc: "Absolute source path",      icon: "󰋩", color: "mauve" },
+        { tab: 0, boxIndex: 6, label: "Workspaces",         desc: "Static count in topbar",    icon: "󰽿", color: "red" },
+        { tab: 1, boxIndex: 1, label: "API Key",            desc: "OpenWeather API key",       icon: "󰌆", color: "blue" },
+        { tab: 1, boxIndex: 2, label: "City ID",            desc: "OpenWeather city ID",       icon: "󰖐", color: "blue" },
+        { tab: 1, boxIndex: 3, label: "Temperature Unit",   desc: "Celsius / Fahrenheit / K",  icon: "󰔄", color: "blue" }
     ]
 
     function getMatchingKeybindIndices(query) {
@@ -927,11 +921,12 @@ Item {
         return card.label.toLowerCase().includes(q) || card.desc.toLowerCase().includes(q);
     }
 
+    // ── MONITOR STATE ─────────────────────────────────────────────────────────
     property color monSelectedResAccent: mauve
     property color monSelectedRateAccent: blue
     property int monChangeTrigger: 0
     property var monResAccentColors: [root.pink, root.mauve, root.blue, root.teal, root.yellow, root.peach, root.green, root.red, root.sapphire, root.sky, root.lavender, root.flamingo]
-    
+
     function getResLabel(w, h) {
         if (w === 7680 && h === 4320) return "8K UHD";
         if (w === 5120 && h === 2880) return "5K";
@@ -955,6 +950,7 @@ Item {
         if (w === 800  && h === 600)  return "SVGA";
         return w + "×" + h;
     }
+
     property var monAvailableResolutions: {
         let _ = monChangeTrigger + Config.monActiveEditIndex;
         if (Config.monitorsModel.count === 0) return [];
@@ -971,6 +967,7 @@ Item {
             return list;
         } catch(e) { return []; }
     }
+
     property var monAvailableRates: {
         let _ = monChangeTrigger + Config.monActiveEditIndex;
         if (Config.monitorsModel.count === 0) return [];
@@ -989,6 +986,7 @@ Item {
             return rates;
         } catch(e) { return []; }
     }
+
     property int monCurrentTransform: {
         let _ = monChangeTrigger;
         return Config.monitorsModel.count > 0 ? Config.monitorsModel.get(Config.monActiveEditIndex).transform : 0;
@@ -1005,10 +1003,9 @@ Item {
         return monCurrentIsPortrait ? mon.resW : mon.resH;
     }
 
-    property real introContent: 0.0
+    // ── INIT ──────────────────────────────────────────────────────────────────
     Component.onCompleted: {
         root.tab0Loaded = true;
-        startupSequence.start();
         if (Config.dataReady && dynamicKeybindsModel.count === 0) {
             for (let i = 0; i < Config.keybindsData.length; i++) {
                 let k = Config.keybindsData[i];
@@ -1027,36 +1024,6 @@ Item {
                 dynamicStartupModel.append({ command: s.command || "", isEditing: false });
             }
         }
-    }
-
-    SequentialAnimation {
-        id: startupSequence
-        PauseAnimation { duration: 50 }
-        NumberAnimation { 
-            target: root
-            property: "introContent"
-            from: 0.0
-            to: 1.0
-            duration: 600
-            easing.type: Easing.OutQuart
-        } 
-    }
-
-    SequentialAnimation {
-        id: closeSequence
-        NumberAnimation { 
-            target: root
-            property: "introContent"
-            to: 0.0
-            duration: 200
-            easing.type: Easing.InQuart
-        }
-        ScriptAction { 
-            script: {
-                Quickshell.execDetached(["hyprctl", "dispatch", "submap", "reset"]);
-                Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "close"]);
-            } 
-        }    
     }
 
     Component {
@@ -2825,736 +2792,436 @@ Item {
     } 
 
 
-    // ── Main Panel ─────────────────────────────────────────────────────────────
-    Rectangle {
-        id: sidebarPanel
+    // ── MAIN TUI PANEL ────────────────────────────────────────────────────────
+    TuiPanel {
+        id: panel
+        label: "SETTINGS"
         anchors.fill: parent
-        color: Qt.rgba(root.base.r, root.base.g, root.base.b, 0.97)
-        radius: root.s(16)
-        border.width: 1
-        border.color: Qt.rgba(root.surface1.r, root.surface1.g, root.surface1.b, 0.9)
-        clip: true
 
-        Rectangle {
-            anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom; width: root.s(16)
-            color: sidebarPanel.color
-            Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: sidebarPanel.border.color }
-            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: sidebarPanel.border.color }
-            Rectangle { anchors.left: parent.left; width: 1; height: parent.height; color: sidebarPanel.border.color }
-        }
-
+        // ── TAB STRIP ────────────────────────────────────────────────────────
         Item {
-            anchors.fill: parent
-            opacity: introContent
-            scale: 0.96 + (0.04 * introContent)
-            transform: Translate { y: root.s(40) * (1.0 - introContent) }
+            id: tabBarArea
+            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+            height: 30
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: root.s(20)
-                spacing: root.s(12)
+            // Tabs (left)
+            Row {
+                id: tabsRow
+                anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
 
-                // ── Header ────────────────────────────────────────────────────
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: root.s(10)
+                Repeater {
+                    model: root.tabNames.length
+                    delegate: Item {
+                        required property int index
+                        property bool isActive: root.currentTab === index
+                        width: 84; height: 30
 
-                    Text { 
-                        text: "Settings"; font.family: "Inter"; font.weight: Font.Bold; font.pixelSize: root.s(24)
-                        color: root.text; Layout.alignment: Qt.AlignVCenter 
-                    }
-
-                    Rectangle {
-                        visible: root.isSearchMode
-                        width: root.s(26); height: root.s(26); radius: root.s(6)
-                        color: closeSearchMa.containsMouse ? Qt.alpha(root.red, 0.15) : "transparent"
-                        border.color: closeSearchMa.containsMouse ? root.red : "transparent"; border.width: 1
-                        opacity: root.isSearchMode ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 200 } }
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        Text { anchors.centerIn: parent; text: "✕"; font.family: "Inter"; font.pixelSize: root.s(12); color: closeSearchMa.containsMouse ? root.red : root.subtext0; Behavior on color { ColorAnimation { duration: 150 } } }
-                        MouseArea {
-                            id: closeSearchMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onClicked: { root.isSearchMode = false; root.globalSearchQuery = ""; globalSearchInput.text = ""; root.searchHighlightIndex = -1; }
-                        }
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    // Save button
-                    Rectangle {
-                        id: headerSaveBtn
-                        visible: root.currentTab !== 2 && root.currentTab !== 4 && !root.isSearchMode
-                        opacity: visible ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
-
-                        Layout.alignment: Qt.AlignVCenter
-                        Layout.preferredHeight: root.s(34)
-                        Layout.preferredWidth: saveBtnRow.implicitWidth + root.s(28)
-
-                        radius: root.s(8)
-                        scale: headerSaveMa.pressed ? 0.94 : (headerSaveMa.containsMouse ? 1.03 : 1.0)
-                        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack } }
-
-                        color: headerSaveMa.pressed
-                            ? Qt.darker(root.mauve, 1.15)
-                            : (headerSaveMa.containsMouse ? root.mauve : root.surface1)
-                        border.color: headerSaveMa.containsMouse ? root.mauve : Qt.alpha(root.mauve, 0.4)
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 180; easing.type: Easing.OutExpo } }
-                        Behavior on border.color { ColorAnimation { duration: 180 } }
-
-                        RowLayout {
-                            id: saveBtnRow
-                            anchors.centerIn: parent
-                            spacing: root.s(7)
-                            Text { 
-                                text: "󰆓"
-                                font.family: "Iosevka Nerd Font"
-                                font.pixelSize: root.s(15)
-                                color: headerSaveMa.containsMouse ? root.base : root.mauve
-                                Behavior on color { ColorAnimation { duration: 180 } }
-                            }
-                            Text { 
-                                text: "Save"
-                                font.family: "JetBrains Mono"
-                                font.weight: Font.Bold
-                                font.pixelSize: root.s(12)
-                                color: headerSaveMa.containsMouse ? root.base : root.text
-                                Behavior on color { ColorAnimation { duration: 180 } }
-                            }
-                        }
-
-                        MouseArea {
-                            id: headerSaveMa
+                        Rectangle {
                             anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (root.currentTab === 0) Config.saveAppSettings();
-                                else if (root.currentTab === 1) Config.saveWeatherConfig();
-                                else if (root.currentTab === 3) Config.applyMonitors();
+                            color: isActive ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.15) : "transparent"
+                            Rectangle {
+                                anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
+                                height: 2; color: isActive ? panel.accent : "transparent"
                             }
                         }
-                    }
-
-                    // Add button
-                    Rectangle {
-                        id: headerAddBtn
-                        visible: (root.currentTab === 2 || root.currentTab === 4) && !root.isSearchMode
-                        opacity: visible ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
-
-                        Layout.alignment: Qt.AlignVCenter
-                        Layout.preferredHeight: root.s(34)
-                        Layout.preferredWidth: addBtnRow.implicitWidth + root.s(28)
-
-                        radius: root.s(8)
-                        scale: headerAddMa.pressed ? 0.94 : (headerAddMa.containsMouse ? 1.03 : 1.0)
-                        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack } }
-
-                        color: headerAddMa.pressed
-                            ? Qt.darker(root.peach, 1.15)
-                            : (headerAddMa.containsMouse ? root.peach : root.surface1)
-                        border.color: headerAddMa.containsMouse ? root.peach : Qt.alpha(root.peach, 0.4)
-                        border.width: 1
-                        Behavior on color { ColorAnimation { duration: 180; easing.type: Easing.OutExpo } }
-                        Behavior on border.color { ColorAnimation { duration: 180 } }
-
-                        RowLayout {
-                            id: addBtnRow
-                            anchors.centerIn: parent
-                            spacing: root.s(7)
-                            Text { 
-                                text: "+"
-                                font.family: "JetBrains Mono"
-                                font.weight: Font.Bold
-                                font.pixelSize: root.s(15)
-                                color: headerAddMa.containsMouse ? root.base : root.peach
-                                Behavior on color { ColorAnimation { duration: 180 } }
-                            }
-                            Text { 
-                                text: "Add"
-                                font.family: "JetBrains Mono"
-                                font.weight: Font.Bold
-                                font.pixelSize: root.s(12)
-                                color: headerAddMa.containsMouse ? root.base : root.text
-                                Behavior on color { ColorAnimation { duration: 180 } }
-                            }
-                        }
-
-                        MouseArea {
-                            id: headerAddMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (root.currentTab === 2) {
-                                    dynamicKeybindsModel.append({ type: "bind", mods: "", key: "", dispatcher: "exec", command: "", isEditing: true });
-                                    scrollTimer.start();
-                                } else if (root.currentTab === 4) {
-                                    dynamicStartupModel.append({ command: "", isEditing: true });
-                                    startupScrollTimer.start();
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ── Search bar ────────────────────────────────────────────────
-                Rectangle {
-                    Layout.fillWidth: true; Layout.preferredHeight: root.s(40); radius: root.s(10)
-                    color: root.isSearchMode
-                        ? Qt.alpha(root.sapphire, 0.06)
-                        : (globalSearchBarMa.containsMouse ? Qt.alpha(root.surface1, 0.6) : Qt.alpha(root.surface0, 0.5))
-                    border.color: root.isSearchMode ? root.sapphire : (globalSearchBarMa.containsMouse ? root.surface2 : root.surface1)
-                    border.width: root.isSearchMode ? 2 : 1
-                    Behavior on color { ColorAnimation { duration: 200 } }
-                    Behavior on border.color { ColorAnimation { duration: 200 } }
-                    Behavior on border.width { NumberAnimation { duration: 150 } }
-
-                    RowLayout {
-                        anchors.fill: parent; anchors.leftMargin: root.s(11); anchors.rightMargin: root.s(11); spacing: root.s(9)
                         Text {
-                            text: "󰍉"; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(15)
-                            color: root.isSearchMode ? root.sapphire : root.subtext0
-                            Behavior on color { ColorAnimation { duration: 200 } }
-                            MouseArea { anchors.fill: parent; anchors.margins: -root.s(6); hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.isSearchMode = true; globalSearchInput.forceActiveFocus(); } }
+                            anchors.centerIn: parent
+                            text: (isActive ? "▸ " : "") + root.tabNames[index].toUpperCase()
+                            font.family: "JetBrains Mono"; font.pixelSize: 10; font.letterSpacing: 0.6
+                            color: isActive ? panel.accent : panel.dim
                         }
-                        TextInput {
-                            id: globalSearchInput
-                            Layout.fillWidth: true; Layout.fillHeight: true; verticalAlignment: TextInput.AlignVCenter
-                            font.family: "JetBrains Mono"; font.pixelSize: root.s(12); color: root.text; clip: true; selectByMouse: true
-                            Text {
-                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                                text: root.isSearchMode ? "Search settings & keybinds..." : "Search"
-                                color: Qt.alpha(root.subtext0, 0.45)
-                                visible: !globalSearchInput.text && !globalSearchInput.activeFocus
-                                font.family: "JetBrains Mono"; font.pixelSize: root.s(12)
-                            }
-                            onActiveFocusChanged: { if (activeFocus && !root.isSearchMode) root.isSearchMode = true; }
-                            onTextChanged: { root.globalSearchQuery = text; if (!root.isSearchMode && text.length > 0) root.isSearchMode = true; }
-                            Keys.onEscapePressed: { root.isSearchMode = false; root.globalSearchQuery = ""; text = ""; root.searchHighlightIndex = -1; root.forceActiveFocus(); }
-                            Keys.onDownPressed: (event) => {
-                                root.forceActiveFocus();
-                                let total = root.searchResultItems.length;
-                                if (total === 0) { event.accepted = true; return; }
-                                root.searchHighlightIndex = root.searchHighlightIndex < total - 1 ? root.searchHighlightIndex + 1 : 0;
-                                root.scrollSearchHighlightIntoView(root.searchHighlightIndex);
-                                event.accepted = true;
-                            }
-                            Keys.onUpPressed: (event) => {
-                                root.forceActiveFocus();
-                                let total = root.searchResultItems.length;
-                                if (total === 0) { event.accepted = true; return; }
-                                root.searchHighlightIndex = root.searchHighlightIndex > 0 ? root.searchHighlightIndex - 1 : (root.searchHighlightIndex === 0 ? total - 1 : total - 1);
-                                root.scrollSearchHighlightIntoView(root.searchHighlightIndex);
-                                event.accepted = true;
-                            }
-                            Keys.onReturnPressed: (event) => {
-                                if (root.searchHighlightIndex >= 0) { root.activateSearchHighlight(); event.accepted = true; }
-                            }
-                            Keys.onEnterPressed: (event) => {
-                                if (root.searchHighlightIndex >= 0) { root.activateSearchHighlight(); event.accepted = true; }
-                            }
-                        }
-                        Rectangle {
-                            visible: root.isSearchMode && globalSearchInput.text.length > 0; width: root.s(20); height: root.s(20); radius: root.s(4)
-                            color: clearSearchBtnMa.containsMouse ? Qt.alpha(root.red, 0.15) : "transparent"
-                            border.color: clearSearchBtnMa.containsMouse ? root.red : "transparent"; border.width: 1
-                            Behavior on color { ColorAnimation { duration: 150 } }
-                            Text { anchors.centerIn: parent; text: "✕"; font.pixelSize: root.s(10); color: clearSearchBtnMa.containsMouse ? root.red : Qt.alpha(root.subtext0, 0.6); Behavior on color { ColorAnimation { duration: 150 } } }
-                            MouseArea { id: clearSearchBtnMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { globalSearchInput.text = ""; globalSearchInput.forceActiveFocus(); } }
-                        }
-                    }
-                    MouseArea { id: globalSearchBarMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; enabled: !root.isSearchMode; onClicked: { root.isSearchMode = true; globalSearchInput.forceActiveFocus(); } }
-                }
-
-                // ── Tab bar ───────────────────────────────────────────────────
-                Item {
-                    id: tabBarContainer
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: root.s(38)
-                    visible: !root.isSearchMode
-                    opacity: root.isSearchMode ? 0.0 : 1.0
-                    Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
-                    clip: true
-
-                    Rectangle {
-                        anchors.fill: parent; radius: root.s(10)
-                        color: root.surface0; border.color: root.surface1; border.width: 1
-                    }
-
-                    Flickable {
-                        id: tabBarFlickable
-                        anchors.fill: parent
-                        clip: false
-                        // UX Update: Elastic boundaries feel much more native and premium than stopping dead
-                        boundsBehavior: Flickable.DragAndOvershootBounds
-
-                        // Reduced the divisor to 2.5 so tabs don't squash and it's clear the list scrolls
-                        property real tabItemW: (tabBarContainer.width - root.s(6)) / (root.tabNames.length <= 3 ? 3 : 2.5)
-                        contentWidth: root.tabNames.length * tabItemW + root.s(6)
-                        contentHeight: height
-
-                        // Graceful smooth scrolling animation for tab selection
-                        NumberAnimation {
-                            id: smoothScrollAnim
-                            target: tabBarFlickable
-                            property: "contentX"
-                            duration: 350
-                            easing.type: Easing.OutCubic
-                        }
-
-                        // UX Update: Dedicated animation for hardware scroll wheels to prevent jagged jumps
-                        NumberAnimation {
-                            id: wheelScrollAnim
-                            target: tabBarFlickable
-                            property: "contentX"
-                            duration: 150
-                            easing.type: Easing.OutSine
-                        }
-
-                        WheelHandler {
-                            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                            onWheel: (event) => {
-                                smoothScrollAnim.stop(); // Cancel auto-scroll if user takes control
-                                
-                                // UX Update: Support both vertical mice and horizontal trackpads seamlessly
-                                let delta = Math.abs(event.angleDelta.x) > 0 ? event.angleDelta.x : event.angleDelta.y;
-                                
-                                // Calculate the target with clamping so the animation doesn't break boundaries
-                                let targetX = Math.max(0, Math.min(
-                                    tabBarFlickable.contentWidth - tabBarFlickable.width,
-                                    tabBarFlickable.contentX - delta * 0.75 // 0.75 smooths out hyper-fast scroll wheels
-                                ));
-                                
-                                wheelScrollAnim.to = targetX;
-                                wheelScrollAnim.start();
-                                
-                                event.accepted = true;
-                            }
-                        }
-
-                        Rectangle {
-                            id: tabHighlightPill
-                            y: root.s(3)
-                            height: root.s(32)
-                            radius: root.s(8)
-
-                            property color c0: root.teal
-                            property color c1: root.blue
-                            property color c2: root.peach
-                            property color c3: root.green
-                            property color c4: root.mauve
-                            property color targetColor: {
-                                if (root.currentTab === 0) return c0;
-                                if (root.currentTab === 1) return c1;
-                                if (root.currentTab === 2) return c2;
-                                if (root.currentTab === 3) return c3;
-                                return c4;
-                            }
-                            color: targetColor
-                            Behavior on color { ColorAnimation { duration: 300; easing.type: Easing.OutExpo } }
-
-                            property int prevTab: 0
-                            property int curTab: root.currentTab
-
-                            onCurTabChanged: {
-                                if (curTab > prevTab) {
-                                    tabRightAnim.duration = 200; tabLeftAnim.duration = 350;
-                                } else if (curTab < prevTab) {
-                                    tabLeftAnim.duration = 200; tabRightAnim.duration = 350;
-                                }
-                                prevTab = curTab;
-                                
-                                // Graceful scrolling: center the newly selected tab
-                                let tLeft = root.s(3) + curTab * tabBarFlickable.tabItemW;
-                                let targetX = tLeft - (tabBarFlickable.width / 2) + (tabBarFlickable.tabItemW / 2);
-                                
-                                // Clamp bounds
-                                targetX = Math.max(0, Math.min(tabBarFlickable.contentWidth - tabBarFlickable.width, targetX));
-                                
-                                smoothScrollAnim.to = targetX;
-                                smoothScrollAnim.start();
-                            }
-
-                            property real targetLeft: root.s(3) + curTab * tabBarFlickable.tabItemW
-                            property real targetRight: targetLeft + tabBarFlickable.tabItemW
-
-                            property real actualLeft: targetLeft
-                            property real actualRight: targetRight
-
-                            Behavior on actualLeft { NumberAnimation { id: tabLeftAnim; duration: 250; easing.type: Easing.OutExpo } }
-                            Behavior on actualRight { NumberAnimation { id: tabRightAnim; duration: 250; easing.type: Easing.OutExpo } }
-
-                            x: actualLeft
-                            width: actualRight - actualLeft
-                        }
-
-                        Row {
-                            x: root.s(3)
-                            spacing: 0
-                            height: tabBarFlickable.height
-
-                            Repeater {
-                                model: root.tabNames.length
-                                Item {
-                                    width: tabBarFlickable.tabItemW
-                                    height: parent.height
-
-                                    property bool isActive: root.currentTab === index
-
-                                    RowLayout {
-                                        anchors.centerIn: parent
-                                        spacing: root.s(7)
-                                        Text {
-                                            text: root.tabIcons[index]
-                                            font.family: "Iosevka Nerd Font"
-                                            font.pixelSize: root.s(14)
-                                            color: isActive ? root.base : root.subtext0
-                                            Behavior on color { ColorAnimation { duration: 250; easing.type: Easing.OutExpo } }
-                                        }
-                                        Text {
-                                            text: root.tabNames[index]
-                                            font.family: "JetBrains Mono"
-                                            font.weight: isActive ? Font.Bold : Font.Medium
-                                            font.pixelSize: root.s(12)
-                                            color: isActive ? root.base : root.subtext0
-                                            Behavior on color { ColorAnimation { duration: 250; easing.type: Easing.OutExpo } }
-                                        }
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: { root.currentTab = index; root.clearHighlight(); }
-                                    }
-                                }
-                            }
+                        MouseArea {
+                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                            onClicked: { root.currentTab = index; root.clearHighlight(); }
                         }
                     }
                 }
+            }
 
-                // ── Content area ──────────────────────────────────────────────
-                Item {
-                    Layout.fillWidth: true; Layout.fillHeight: true
+            // Search toggle [/]
+            Item {
+                id: searchToggleBtn
+                anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
+                width: 28; height: 22
 
-                    // Search results
-                    Flickable {
-                        id: searchResultsFlickable
-                        anchors.fill: parent; contentWidth: width
-                        contentHeight: searchResultsCol.implicitHeight + root.s(40)
-                        boundsBehavior: Flickable.StopAtBounds; clip: true
-                        visible: root.isSearchMode
-                        opacity: root.isSearchMode ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 250 } }
-
-                        MouseArea { anchors.fill: parent; onClicked: root.clearHighlight(); z: -1 }
-
-                        ColumnLayout {
-                            id: searchResultsCol; width: parent.width; spacing: root.s(8)
-
-                            Item {
-                                Layout.fillWidth: true; Layout.preferredHeight: root.s(80)
-                                visible: root.globalSearchQuery.trim() === ""
-                                ColumnLayout {
-                                    anchors.centerIn: parent; spacing: root.s(8)
-                                    Text { Layout.alignment: Qt.AlignHCenter; text: ""; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(30); color: Qt.alpha(root.subtext0, 0.25) }
-                                    Text { Layout.alignment: Qt.AlignHCenter; text: "Type to search settings & keybinds..."; font.family: "JetBrains Mono"; font.pixelSize: root.s(12); color: Qt.alpha(root.subtext0, 0.35) }
-                                }
-                            }
-
-                            Repeater {
-                                id: settingsCardRepeater
-                                model: root.allSettingsCards.length
-                                delegate: Item {
-                                    property var card: root.allSettingsCards[index]
-                                    property bool matches: root.globalSearchMatches(card, root.globalSearchQuery)
-                                    property int searchListIndex: {
-                                        let pos = 0;
-                                        for (let i = 0; i < root.searchResultItems.length; i++) {
-                                            if (root.searchResultItems[i].kind === "card" && root.searchResultItems[i].cardIndex === index) { pos = i; break; }
-                                        }
-                                        return pos;
-                                    }
-                                    property bool isSearchHighlighted: matches && root.searchHighlightIndex === searchListIndex && root.searchHighlightIndex >= 0
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: matches ? root.s(58) : 0
-                                    visible: matches; opacity: matches ? 1.0 : 0.0; clip: true
-                                    Behavior on Layout.preferredHeight { NumberAnimation { duration: 350; easing.type: Easing.OutExpo } }
-                                    Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutQuart } }
-
-                                    Rectangle {
-                                        anchors.fill: parent; radius: root.s(10)
-                                        color: isSearchHighlighted
-                                            ? root.surface1
-                                            : (searchCardMa.containsMouse ? root.surface1 : root.surface0)
-                                        border.color: isSearchHighlighted ? root[card.color] : (searchCardMa.containsMouse ? root[card.color] : root.surface1)
-                                        border.width: isSearchHighlighted ? 2 : 1
-                                        Behavior on color { ColorAnimation { duration: 200; easing.type: Easing.OutExpo } }
-                                        Behavior on border.color { ColorAnimation { duration: 200; easing.type: Easing.OutExpo } }
-
-                                        RowLayout {
-                                            anchors.fill: parent; anchors.margins: root.s(12); spacing: root.s(12)
-                                            Rectangle {
-                                                width: root.s(32); height: root.s(32); radius: root.s(8)
-                                                color: Qt.alpha(root[card.color], 0.15)
-                                                border.color: Qt.alpha(root[card.color], 0.3); border.width: 1
-                                                Text {
-                                                    anchors.centerIn: parent; text: card.icon; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(15)
-                                                    color: root[card.color]
-                                                }
-                                            }
-                                            ColumnLayout {
-                                                Layout.fillWidth: true; spacing: root.s(2)
-                                                Text {
-                                                    text: card.label; font.family: "Inter"; font.weight: Font.Medium; font.pixelSize: root.s(13)
-                                                    color: isSearchHighlighted ? root[card.color] : root.text; Layout.fillWidth: true
-                                                    Behavior on color { ColorAnimation { duration: 200 } }
-                                                }
-                                                Text {
-                                                    text: card.desc; font.family: "Inter"; font.pixelSize: root.s(10)
-                                                    color: Qt.alpha(root.subtext0, 0.7); Layout.fillWidth: true
-                                                }
-                                            }
-                                            Rectangle {
-                                                height: root.s(20); width: tabBadgeText.implicitWidth + root.s(12); radius: root.s(10)
-                                                color: Qt.alpha(root[root.tabColors[card.tab]], 0.15)
-                                                border.color: Qt.alpha(root[root.tabColors[card.tab]], 0.4); border.width: 1
-                                                Text {
-                                                    id: tabBadgeText; anchors.centerIn: parent; text: root.tabNames[card.tab]
-                                                    font.family: "JetBrains Mono"; font.pixelSize: root.s(9)
-                                                    color: root[root.tabColors[card.tab]]
-                                                }
-                                            }
-                                            Text {
-                                                text: "›"; font.family: "Inter"; font.pixelSize: root.s(18)
-                                                color: isSearchHighlighted ? root[card.color] : (searchCardMa.containsMouse ? root[card.color] : root.subtext0)
-                                                Behavior on color { ColorAnimation { duration: 150 } }
-                                            }
-                                        }
-                                        MouseArea {
-                                            id: searchCardMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                jumpToSettingTimer.targetTab = card.tab;
-                                                jumpToSettingTimer.targetBox = card.boxIndex;
-                                                jumpToSettingTimer.start();
-                                                root.currentTab = card.tab;
-                                                if (card.tab === 0) root.tab0Loaded = true;
-                                                else if (card.tab === 1) root.tab1Loaded = true;
-                                                else if (card.tab === 2) root.tab2Loaded = true;
-                                                root.isSearchMode = false;
-                                                root.forceActiveFocus();
-                                                globalSearchInput.text = "";
-                                                root.globalSearchQuery = "";
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Item {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: (root.globalSearchQuery.trim() !== "" && root.matchingKeybindIndices.length > 0) ? root.s(30) : 0
-                                visible: root.globalSearchQuery.trim() !== "" && root.matchingKeybindIndices.length > 0
-                                opacity: visible ? 1.0 : 0.0; clip: true
-                                Behavior on Layout.preferredHeight { NumberAnimation { duration: 300; easing.type: Easing.OutExpo } }
-                                Behavior on opacity { NumberAnimation { duration: 200 } }
-                                RowLayout {
-                                    anchors.fill: parent; anchors.leftMargin: root.s(4); spacing: root.s(8)
-                                    Rectangle { width: root.s(3); height: root.s(12); radius: root.s(2); color: root.peach }
-                                    Text { text: "Keybinds (" + root.matchingKeybindIndices.length + " match" + (root.matchingKeybindIndices.length !== 1 ? "es" : "") + ")"; font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(10); color: root.peach }
-                                }
-                            }
-
-                            Repeater {
-                                id: keybindResultRepeater
-                                model: root.matchingKeybindIndices.length
-                                delegate: Item {
-                                    property int kbIndex: root.matchingKeybindIndices[index]
-                                    property var kbItem: dynamicKeybindsModel.get(kbIndex)
-                                    property int searchListIndex: {
-                                        let nCards = 0;
-                                        for (let i = 0; i < root.allSettingsCards.length; i++) {
-                                            if (root.globalSearchMatches(root.allSettingsCards[i], root.globalSearchQuery)) nCards++;
-                                        }
-                                        return nCards + index;
-                                    }
-                                    property bool isSearchHighlighted: root.searchHighlightIndex === searchListIndex && root.searchHighlightIndex >= 0
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: root.globalSearchQuery.trim() !== "" ? root.s(54) : 0
-                                    visible: root.globalSearchQuery.trim() !== ""; opacity: visible ? 1.0 : 0.0; clip: true
-                                    Behavior on Layout.preferredHeight { NumberAnimation { duration: 300; easing.type: Easing.OutExpo } }
-                                    Behavior on opacity { NumberAnimation { duration: 200 } }
-
-                                    Rectangle {
-                                        anchors.fill: parent; radius: root.s(10)
-                                        color: isSearchHighlighted ? root.surface1 : (kbResultMa.containsMouse ? root.surface1 : root.surface0)
-                                        border.color: isSearchHighlighted ? root.peach : (kbResultMa.containsMouse ? root.peach : root.surface1)
-                                        border.width: isSearchHighlighted ? 2 : 1
-                                        Behavior on color { ColorAnimation { duration: 200; easing.type: Easing.OutExpo } }
-                                        Behavior on border.color { ColorAnimation { duration: 200; easing.type: Easing.OutExpo } }
-
-                                        RowLayout {
-                                            anchors.fill: parent; anchors.margins: root.s(11); spacing: root.s(11)
-                                            Rectangle {
-                                                width: root.s(32); height: root.s(32); radius: root.s(8)
-                                                color: Qt.alpha(root.peach, 0.12)
-                                                border.color: Qt.alpha(root.peach, 0.25); border.width: 1
-                                                Text {
-                                                    anchors.centerIn: parent; text: "󰌌"; font.family: "Iosevka Nerd Font"; font.pixelSize: root.s(15)
-                                                    color: root.peach
-                                                }
-                                            }
-                                            ColumnLayout {
-                                                Layout.fillWidth: true; spacing: root.s(3)
-                                                Row {
-                                                    spacing: root.s(4)
-                                                    Rectangle {
-                                                        width: modsT.implicitWidth + root.s(8); height: root.s(18); radius: root.s(4)
-                                                        color: root.surface1
-                                                        border.color: root.surface2; border.width: 1
-                                                        visible: kbItem && kbItem.mods !== ""
-                                                        Text {
-                                                            id: modsT; anchors.centerIn: parent; text: kbItem ? kbItem.mods : ""
-                                                            font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(8)
-                                                            color: root.peach
-                                                        }
-                                                    }
-                                                    Text {
-                                                        text: "+"; font.family: "JetBrains Mono"; font.pixelSize: root.s(9)
-                                                        color: root.overlay0
-                                                        visible: kbItem && kbItem.mods !== "" && kbItem.key !== ""; anchors.verticalCenter: parent.verticalCenter
-                                                    }
-                                                    Rectangle {
-                                                        width: keyT.implicitWidth + root.s(8); height: root.s(18); radius: root.s(4)
-                                                        color: root.surface1
-                                                        border.color: root.surface2; border.width: 1
-                                                        visible: kbItem && kbItem.key !== ""
-                                                        Text {
-                                                            id: keyT; anchors.centerIn: parent; text: kbItem ? kbItem.key : ""
-                                                            font.family: "JetBrains Mono"; font.weight: Font.Bold; font.pixelSize: root.s(8)
-                                                            color: root.peach
-                                                        }
-                                                    }
-                                                }
-                                                Text {
-                                                    text: kbItem ? (kbItem.dispatcher + " " + kbItem.command).trim() : ""
-                                                    font.family: "JetBrains Mono"; font.pixelSize: root.s(9)
-                                                    color: isSearchHighlighted ? root.peach : Qt.alpha(root.subtext0, 0.7)
-                                                    elide: Text.ElideRight; Layout.fillWidth: true
-                                                    Behavior on color { ColorAnimation { duration: 200 } }
-                                                }
-                                            }
-                                            Rectangle {
-                                                height: root.s(20); width: kbBadgeText.implicitWidth + root.s(12); radius: root.s(10)
-                                                color: Qt.alpha(root.peach, 0.12)
-                                                border.color: Qt.alpha(root.peach, 0.35); border.width: 1
-                                                Text {
-                                                    id: kbBadgeText; anchors.centerIn: parent; text: "Keybinds"
-                                                    font.family: "JetBrains Mono"; font.pixelSize: root.s(9)
-                                                    color: root.peach
-                                                }
-                                            }
-                                            Text {
-                                                text: "›"; font.family: "Inter"; font.pixelSize: root.s(18)
-                                                color: isSearchHighlighted ? root.peach : (kbResultMa.containsMouse ? root.peach : root.subtext0)
-                                                Behavior on color { ColorAnimation { duration: 150 } }
-                                            }
-                                        }
-                                        MouseArea {
-                                            id: kbResultMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                jumpToSettingTimer.targetTab = 2;
-                                                jumpToSettingTimer.targetBox = kbIndex;
-                                                jumpToSettingTimer.start();
-                                                root.currentTab = 2;
-                                                root.tab2Loaded = true;
-                                                root.isSearchMode = false;
-                                                root.forceActiveFocus();
-                                                globalSearchInput.text = "";
-                                                root.globalSearchQuery = "";
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                Rectangle {
+                    anchors.fill: parent
+                    color: root.isSearchMode ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.2) : "transparent"
+                    border.color: root.isSearchMode ? panel.accent : panel.dim; border.width: 1
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: root.isSearchMode ? "✕" : "/"
+                    font.family: "JetBrains Mono"; font.pixelSize: 11
+                    color: root.isSearchMode ? panel.accent : panel.dim
+                }
+                MouseArea {
+                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (root.isSearchMode) {
+                            root.isSearchMode = false; root.globalSearchQuery = "";
+                            globalSearchInput.text = ""; root.searchHighlightIndex = -1;
+                        } else {
+                            root.isSearchMode = true; globalSearchInput.forceActiveFocus();
                         }
                     }
+                }
+            }
 
-                    Loader {
-                        id: generalLoader
-                        anchors.fill: parent
-                        active: root.tab0Loaded && Config.dataReady
-                        sourceComponent: generalTabComponent
-                        visible: root.currentTab === 0 && !root.isSearchMode
-                        opacity: visible ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
-                        function focusLangInput() { if (item) item.focusLangInput(); }
-                        function focusWpDirInput() { if (item) item.focusWpDirInput(); }
-                        function layoutListIncrementIndex() { if (item) item.layoutListIncrementIndex(); }
-                        function layoutListDecrementIndex() { if (item) item.layoutListDecrementIndex(); }
-                        function acceptLayoutSelection() { if (item) item.acceptLayoutSelection(); }
-                        function scrollTo(y) { if (item) item.scrollTo(y); }
-                        function scrollToBox(y) { if (item) item.scrollToBox(y); }
+            // Save button [SAVE] — tabs 0, 1, 3
+            Item {
+                id: saveBtn
+                anchors.right: searchToggleBtn.left; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
+                visible: root.currentTab !== 2 && root.currentTab !== 4 && !root.isSearchMode
+                width: 54; height: 22
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: saveMa.containsMouse ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.2) : "transparent"
+                    border.color: panel.accent; border.width: 1
+                }
+                Text {
+                    anchors.centerIn: parent; text: "[SAVE]"
+                    font.family: "JetBrains Mono"; font.pixelSize: 10; font.letterSpacing: 0.8
+                    color: panel.accent
+                }
+                MouseArea {
+                    id: saveMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (root.currentTab === 0) Config.saveAppSettings();
+                        else if (root.currentTab === 1) Config.saveWeatherConfig();
+                        else if (root.currentTab === 3) Config.applyMonitors();
                     }
+                }
+            }
 
-                    Loader {
-                        id: weatherLoader
-                        anchors.fill: parent
-                        active: root.tab1Loaded && Config.dataReady
-                        sourceComponent: weatherTabComponent
-                        visible: root.currentTab === 1 && !root.isSearchMode
-                        opacity: visible ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
-                        function focusApiKey() { if (item) item.focusApiKey(); }
-                        function focusCityId() { if (item) item.focusCityId(); }
-                        function scrollTo(y) { if (item) item.scrollTo(y); }
-                        function scrollToBox(y) { if (item) item.scrollToBox(y); }
-                    }
+            // Add button [+ADD] — tabs 2, 4
+            Item {
+                id: addBtn
+                anchors.right: searchToggleBtn.left; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter
+                visible: (root.currentTab === 2 || root.currentTab === 4) && !root.isSearchMode
+                width: 50; height: 22
 
-                    Loader {
-                        id: keybindLoader
-                        anchors.fill: parent
-                        active: root.tab2Loaded && Config.dataReady
-                        sourceComponent: keybindTabComponent
-                        visible: root.currentTab === 2 && !root.isSearchMode
-                        opacity: visible ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
-                        function scrollToBottom() { if (item) item.scrollToBottom(); }
-                        function scrollTo(y) { if (item) item.scrollTo(y); }
-                        function scrollToBox(y) { if (item) item.scrollToBox(y); }
-                    }
-
-                    Loader {
-                        id: startupLoader
-                        anchors.fill: parent
-                        active: root.tab4Loaded && Config.dataReady
-                        sourceComponent: startupTabComponent
-                        visible: root.currentTab === 4 && !root.isSearchMode
-                        opacity: visible ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
-                        function scrollToBottom() { if (item) item.scrollToBottom(); }
-                        function scrollTo(y) { if (item) item.scrollTo(y); }
-                        function scrollToBox(y) { if (item) item.scrollToBox(y); }
-                    }
-
-                    Loader {
-                        id: monitorsLoader
-                        anchors.fill: parent
-                        active: root.tab3Loaded
-                        sourceComponent: monitorsTabComponent
-                        visible: root.currentTab === 3 && !root.isSearchMode
-                        opacity: visible ? 1.0 : 0.0
-                        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutExpo } }
+                Rectangle {
+                    anchors.fill: parent
+                    color: addMa.containsMouse ? Qt.rgba(panel.peach.r, panel.peach.g, panel.peach.b, 0.2) : "transparent"
+                    border.color: panel.peach; border.width: 1
+                }
+                Text {
+                    anchors.centerIn: parent; text: "[+ADD]"
+                    font.family: "JetBrains Mono"; font.pixelSize: 10; font.letterSpacing: 0.8
+                    color: panel.peach
+                }
+                MouseArea {
+                    id: addMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (root.currentTab === 2) {
+                            dynamicKeybindsModel.append({ type: "bind", mods: "", key: "", dispatcher: "exec", command: "", isEditing: true });
+                            scrollTimer.start();
+                        } else if (root.currentTab === 4) {
+                            dynamicStartupModel.append({ command: "", isEditing: true });
+                            startupScrollTimer.start();
+                        }
                     }
                 }
             }
         }
-    }
 
+        // ── TAB SEP ──────────────────────────────────────────────────────────
+        Rectangle {
+            id: tabSep
+            anchors.top: tabBarArea.bottom; anchors.left: parent.left; anchors.right: parent.right
+            height: 1; color: panel.sep
+        }
+
+        // ── SEARCH INPUT ROW ─────────────────────────────────────────────────
+        Item {
+            id: searchInputRow
+            anchors.top: tabSep.bottom; anchors.left: parent.left; anchors.right: parent.right
+            height: root.isSearchMode ? 32 : 0
+            clip: true
+
+            Rectangle {
+                anchors.fill: parent
+                color: Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.06)
+            }
+
+            Row {
+                anchors.left: parent.left; anchors.leftMargin: 10; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+                Text {
+                    text: "/"
+                    font.family: "JetBrains Mono"; font.pixelSize: 11
+                    color: panel.accent; anchors.verticalCenter: parent.verticalCenter
+                }
+                TextInput {
+                    id: globalSearchInput
+                    width: parent.width - 20; height: 20
+                    verticalAlignment: TextInput.AlignVCenter
+                    font.family: "JetBrains Mono"; font.pixelSize: 11; color: panel.fg; clip: true; selectByMouse: true
+
+                    Text {
+                        anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                        text: "search settings & keybinds..."
+                        color: Qt.alpha(panel.dim, 0.5)
+                        visible: !parent.text && root.isSearchMode
+                        font.family: "JetBrains Mono"; font.pixelSize: 11
+                    }
+
+                    onActiveFocusChanged: { if (activeFocus && !root.isSearchMode) root.isSearchMode = true; }
+                    onTextChanged: { root.globalSearchQuery = text; if (!root.isSearchMode && text.length > 0) root.isSearchMode = true; }
+                    Keys.onEscapePressed: { root.isSearchMode = false; root.globalSearchQuery = ""; text = ""; root.searchHighlightIndex = -1; root.forceActiveFocus(); }
+                    Keys.onDownPressed: (event) => {
+                        root.forceActiveFocus();
+                        let total = root.searchResultItems.length;
+                        if (total === 0) { event.accepted = true; return; }
+                        root.searchHighlightIndex = root.searchHighlightIndex < total - 1 ? root.searchHighlightIndex + 1 : 0;
+                        root.scrollSearchHighlightIntoView(root.searchHighlightIndex);
+                        event.accepted = true;
+                    }
+                    Keys.onUpPressed: (event) => {
+                        root.forceActiveFocus();
+                        let total = root.searchResultItems.length;
+                        if (total === 0) { event.accepted = true; return; }
+                        root.searchHighlightIndex = root.searchHighlightIndex > 0 ? root.searchHighlightIndex - 1 : (root.searchHighlightIndex === 0 ? total - 1 : total - 1);
+                        root.scrollSearchHighlightIntoView(root.searchHighlightIndex);
+                        event.accepted = true;
+                    }
+                    Keys.onReturnPressed: (event) => { if (root.searchHighlightIndex >= 0) { root.activateSearchHighlight(); event.accepted = true; } }
+                    Keys.onEnterPressed:  (event) => { if (root.searchHighlightIndex >= 0) { root.activateSearchHighlight(); event.accepted = true; } }
+                }
+            }
+        }
+
+        Rectangle {
+            id: searchSep
+            anchors.top: searchInputRow.bottom; anchors.left: parent.left; anchors.right: parent.right
+            height: root.isSearchMode ? 1 : 0; color: panel.sep
+        }
+
+        // ── CONTENT AREA ─────────────────────────────────────────────────────
+        Item {
+            id: contentArea
+            anchors.top: searchSep.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+
+            // ── SEARCH RESULTS ────────────────────────────────────────────────
+            Flickable {
+                id: searchResultsFlickable
+                anchors.fill: parent
+                contentWidth: width
+                contentHeight: searchResultsCol.implicitHeight + 40
+                boundsBehavior: Flickable.StopAtBounds; clip: true
+                visible: root.isSearchMode
+
+                MouseArea { anchors.fill: parent; onClicked: root.clearHighlight(); z: -1 }
+
+                ColumnLayout {
+                    id: searchResultsCol
+                    width: parent.width
+                    spacing: 2
+
+                    // Empty state
+                    Item {
+                        Layout.fillWidth: true; Layout.preferredHeight: 50
+                        visible: root.globalSearchQuery.trim() === ""
+                        Text {
+                            anchors.centerIn: parent
+                            text: "─[ / to search settings & keybinds ]"
+                            font.family: "JetBrains Mono"; font.pixelSize: 10; color: Qt.alpha(panel.dim, 0.5)
+                        }
+                    }
+
+                    // Settings cards
+                    Repeater {
+                        id: settingsCardRepeater
+                        model: root.allSettingsCards.length
+                        delegate: Item {
+                            required property int index
+                            property var card: root.allSettingsCards[index]
+                            property bool matches: root.globalSearchMatches(card, root.globalSearchQuery)
+                            property int searchListIndex: {
+                                let pos = 0;
+                                for (let i = 0; i < root.searchResultItems.length; i++) {
+                                    if (root.searchResultItems[i].kind === "card" && root.searchResultItems[i].cardIndex === index) { pos = i; break; }
+                                }
+                                return pos;
+                            }
+                            property bool isSearchHighlighted: matches && root.searchHighlightIndex === searchListIndex && root.searchHighlightIndex >= 0
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: matches ? 34 : 0
+                            visible: matches; clip: true
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: isSearchHighlighted ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.18) : "transparent"
+                                border.color: isSearchHighlighted ? panel.accent : Qt.rgba(panel.sep.r, panel.sep.g, panel.sep.b, 0.4); border.width: 1
+
+                                Text {
+                                    anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
+                                    text: card.label
+                                    font.family: "JetBrains Mono"; font.pixelSize: 10; font.weight: Font.Bold
+                                    color: isSearchHighlighted ? panel.accent : panel.fg
+                                }
+                                Text {
+                                    anchors.left: parent.left; anchors.leftMargin: 12 + 140; anchors.verticalCenter: parent.verticalCenter
+                                    text: card.desc
+                                    font.family: "JetBrains Mono"; font.pixelSize: 9
+                                    color: panel.dim
+                                }
+                                Text {
+                                    anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+                                    text: root.tabNames[card.tab].toUpperCase()
+                                    font.family: "JetBrains Mono"; font.pixelSize: 9; color: Qt.alpha(panel.dim, 0.7)
+                                }
+                                MouseArea {
+                                    id: searchCardMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        jumpToSettingTimer.targetTab = card.tab;
+                                        jumpToSettingTimer.targetBox = card.boxIndex;
+                                        jumpToSettingTimer.start();
+                                        root.currentTab = card.tab;
+                                        if (card.tab === 0) root.tab0Loaded = true;
+                                        else if (card.tab === 1) root.tab1Loaded = true;
+                                        else if (card.tab === 2) root.tab2Loaded = true;
+                                        else if (card.tab === 3) root.tab3Loaded = true;
+                                        root.isSearchMode = false;
+                                        root.forceActiveFocus();
+                                        globalSearchInput.text = "";
+                                        root.globalSearchQuery = "";
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Keybind section header
+                    Item {
+                        Layout.fillWidth: true; Layout.preferredHeight: visible ? 24 : 0
+                        visible: root.matchingKeybindIndices.length > 0 && root.globalSearchQuery.trim() !== ""
+                        Text {
+                            anchors.left: parent.left; anchors.leftMargin: 8; anchors.verticalCenter: parent.verticalCenter
+                            text: "─[ KEYBINDS ]"
+                            font.family: "JetBrains Mono"; font.pixelSize: 9; color: panel.dim
+                        }
+                    }
+
+                    // Keybind results
+                    Repeater {
+                        model: root.matchingKeybindIndices.length
+                        delegate: Item {
+                            required property int index
+                            property int kbIndex: root.matchingKeybindIndices[index]
+                            property var kbItem: dynamicKeybindsModel.count > kbIndex ? dynamicKeybindsModel.get(kbIndex) : null
+                            property int searchListIndex: {
+                                let cardCount = 0;
+                                for (let i = 0; i < root.allSettingsCards.length; i++) {
+                                    if (root.globalSearchMatches(root.allSettingsCards[i], root.globalSearchQuery)) cardCount++;
+                                }
+                                return cardCount + index;
+                            }
+                            property bool isSearchHighlighted: root.searchHighlightIndex === searchListIndex && root.searchHighlightIndex >= 0
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: root.globalSearchQuery.trim() !== "" ? 30 : 0
+                            visible: root.globalSearchQuery.trim() !== ""; clip: true
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: isSearchHighlighted ? Qt.rgba(panel.peach.r, panel.peach.g, panel.peach.b, 0.18) : "transparent"
+                                border.color: isSearchHighlighted ? panel.peach : Qt.rgba(panel.sep.r, panel.sep.g, panel.sep.b, 0.4); border.width: 1
+
+                                Row {
+                                    anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 8
+                                    Text {
+                                        text: kbItem ? (kbItem.mods ? kbItem.mods + " + " : "") + kbItem.key : ""
+                                        font.family: "JetBrains Mono"; font.pixelSize: 10; font.weight: Font.Bold
+                                        color: isSearchHighlighted ? panel.peach : panel.accent
+                                    }
+                                    Text {
+                                        text: kbItem ? (kbItem.dispatcher + " " + kbItem.command).trim() : ""
+                                        font.family: "JetBrains Mono"; font.pixelSize: 9
+                                        color: panel.dim
+                                    }
+                                }
+                                MouseArea {
+                                    id: kbResultMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        jumpToSettingTimer.targetTab = 2;
+                                        jumpToSettingTimer.targetBox = kbIndex;
+                                        jumpToSettingTimer.start();
+                                        root.currentTab = 2;
+                                        root.tab2Loaded = true;
+                                        root.isSearchMode = false;
+                                        root.forceActiveFocus();
+                                        globalSearchInput.text = "";
+                                        root.globalSearchQuery = "";
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── TAB LOADERS ───────────────────────────────────────────────────
+            Loader {
+                id: generalLoader
+                anchors.fill: parent
+                active: root.tab0Loaded && Config.dataReady
+                sourceComponent: generalTabComponent
+                visible: root.currentTab === 0 && !root.isSearchMode
+                function focusLangInput() { if (item) item.focusLangInput(); }
+                function focusWpDirInput() { if (item) item.focusWpDirInput(); }
+                function layoutListIncrementIndex() { if (item) item.layoutListIncrementIndex(); }
+                function layoutListDecrementIndex() { if (item) item.layoutListDecrementIndex(); }
+                function acceptLayoutSelection() { if (item) item.acceptLayoutSelection(); }
+                function scrollTo(y) { if (item) item.scrollTo(y); }
+                function scrollToBox(y) { if (item) item.scrollToBox(y); }
+            }
+
+            Loader {
+                id: weatherLoader
+                anchors.fill: parent
+                active: root.tab1Loaded && Config.dataReady
+                sourceComponent: weatherTabComponent
+                visible: root.currentTab === 1 && !root.isSearchMode
+                function focusApiKey() { if (item) item.focusApiKey(); }
+                function focusCityId() { if (item) item.focusCityId(); }
+                function scrollTo(y) { if (item) item.scrollTo(y); }
+                function scrollToBox(y) { if (item) item.scrollToBox(y); }
+            }
+
+            Loader {
+                id: keybindLoader
+                anchors.fill: parent
+                active: root.tab2Loaded && Config.dataReady
+                sourceComponent: keybindTabComponent
+                visible: root.currentTab === 2 && !root.isSearchMode
+                function scrollToBottom() { if (item) item.scrollToBottom(); }
+                function scrollTo(y) { if (item) item.scrollTo(y); }
+                function scrollToBox(y) { if (item) item.scrollToBox(y); }
+            }
+
+            Loader {
+                id: startupLoader
+                anchors.fill: parent
+                active: root.tab4Loaded && Config.dataReady
+                sourceComponent: startupTabComponent
+                visible: root.currentTab === 4 && !root.isSearchMode
+                function scrollToBottom() { if (item) item.scrollToBottom(); }
+                function scrollTo(y) { if (item) item.scrollTo(y); }
+                function scrollToBox(y) { if (item) item.scrollToBox(y); }
+            }
+
+            Loader {
+                id: monitorsLoader
+                anchors.fill: parent
+                active: root.tab3Loaded
+                sourceComponent: monitorsTabComponent
+                visible: root.currentTab === 3 && !root.isSearchMode
+            }
+        }
+    }
     Component {
         id: startupTabComponent
         Item {

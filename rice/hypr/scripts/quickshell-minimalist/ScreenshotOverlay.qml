@@ -213,7 +213,7 @@ PanelWindow {
 
         height: s(36)
         width: label !== "" ? (txt.implicitWidth + s(36)) : s(36)
-        radius: 0
+        radius: s(18)
         
         // Idle is a solid base color, full matte filled-look
         color: tBtn.isDanger ? _theme.red : (maBtn.containsMouse ? _theme.surface1 : _theme.surface0)
@@ -293,7 +293,7 @@ PanelWindow {
             color: Qt.alpha(_theme.green, 0.25)
             border.color: _theme.green
             border.width: s(3)
-            radius: 0
+            radius: s(8)
             z: 34
             Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutQuart } }
             Behavior on pad { NumberAnimation { duration: 400; easing.type: Easing.OutQuart } }
@@ -301,7 +301,7 @@ PanelWindow {
     }
 
     component Handle: Rectangle {
-        width: s(20); height: s(20); radius: 0
+        width: s(20); height: s(20); radius: s(10)
         color: root.handleColor; border.color: root.accentColor; border.width: s(4)
         visible: (root.hasSelection || root.isSelecting) && !root.isScanningQr && !root.showQrPopup && !root.isVideoMode; z: 10
     }
@@ -426,7 +426,7 @@ PanelWindow {
             color: Qt.rgba(_theme.base.r, _theme.base.g, _theme.base.b, 0.85)
             border.color: Qt.rgba(_theme.text.r, _theme.text.g, _theme.text.b, 0.08)
             border.width: s(1)
-            radius: 0
+            radius: s(24)
         }
 
         component AudioControl: RowLayout {
@@ -443,7 +443,7 @@ PanelWindow {
             spacing: s(4)
 
             Rectangle {
-                width: s(30); height: s(30); radius: 0
+                width: s(30); height: s(30); radius: s(15)
                 // Filled, solid matte-look on idle
                 color: maIcon.containsMouse ? _theme.surface2 : _theme.surface0
                 Behavior on color { ColorAnimation { duration: 150 } }
@@ -470,14 +470,14 @@ PanelWindow {
                     x: parent.leftPadding; y: parent.topPadding + parent.availableHeight / 2 - height / 2
                     implicitWidth: s(60); implicitHeight: s(4)
                     width: parent.availableWidth; height: implicitHeight
-                    radius: 1
+                    radius: s(2)
                     color: _theme.surface2
-                    Rectangle { width: parent.parent.visualPosition * parent.width; height: parent.height; color: parent.parent.parent.mutedValue ? _theme.subtext0 : _theme.mauve; radius: 1 }
+                    Rectangle { width: parent.parent.visualPosition * parent.width; height: parent.height; color: parent.parent.parent.mutedValue ? _theme.subtext0 : _theme.mauve; radius: s(2) }
                 }
                 handle: Rectangle {
                     x: parent.leftPadding + parent.visualPosition * (parent.availableWidth - width)
                     y: parent.topPadding + parent.availableHeight / 2 - height / 2
-                    implicitWidth: s(12); implicitHeight: s(12); radius: 0
+                    implicitWidth: s(12); implicitHeight: s(12); radius: s(6)
                     color: parent.parent.parent.mutedValue ? _theme.subtext0 : _theme.mauve
                 }
             }
@@ -508,7 +508,7 @@ PanelWindow {
             color: Qt.rgba(_theme.base.r, _theme.base.g, _theme.base.b, 0.95)
             border.color: Qt.rgba(_theme.text.r, _theme.text.g, _theme.text.b, 0.08)
             border.width: s(1)
-            radius: 0
+            radius: s(12)
             z: 50
 
             Text {
@@ -525,7 +525,7 @@ PanelWindow {
                 model: micModel
                 clip: true
                 delegate: Rectangle {
-                    width: ListView.view.width; height: s(32); radius: 0
+                    width: ListView.view.width; height: s(32); radius: s(6)
                     color: maList.containsMouse ? _theme.surface0 : "transparent"
                     RowLayout {
                         anchors.fill: parent; anchors.margins: s(6)
@@ -554,14 +554,14 @@ PanelWindow {
                 width: s(110) + s(3); height: parent.height
                 
                 Rectangle {
-                    width: s(110); height: s(36); radius: 0 
+                    width: s(110); height: s(36); radius: s(18) 
                     color: _theme.surface0
                     
                     Rectangle {
                         id: activeHighlight
                         y: s(2)
                         height: parent.height - s(4)
-                        radius: 0 
+                        radius: s(16) 
                         color: _theme.mauve
                         z: 0
 
@@ -608,7 +608,7 @@ PanelWindow {
             // Video Controls
             AnimWrap {
                 isShown: root.isVideoMode; contentWidth: s(2)
-                Rectangle { width: s(2); height: s(16); anchors.verticalCenter: parent.verticalCenter; color: _theme.surface0; radius: 1 }
+                Rectangle { width: s(2); height: s(16); anchors.verticalCenter: parent.verticalCenter; color: _theme.surface0; radius: s(1) }
             }
 
             AnimWrap {
@@ -637,7 +637,7 @@ PanelWindow {
             // Image Controls
             AnimWrap {
                 isShown: !root.isVideoMode; contentWidth: s(2)
-                Rectangle { width: s(2); height: s(16); anchors.verticalCenter: parent.verticalCenter; color: _theme.surface0; radius: 1 }
+                Rectangle { width: s(2); height: s(16); anchors.verticalCenter: parent.verticalCenter; color: _theme.surface0; radius: s(1) }
             }
 
             AnimWrap {
@@ -652,7 +652,7 @@ PanelWindow {
 
             AnimWrap {
                 isShown: !root.isVideoMode; contentWidth: s(2)
-                Rectangle { width: s(2); height: s(16); anchors.verticalCenter: parent.verticalCenter; color: _theme.surface0; radius: 1 }
+                Rectangle { width: s(2); height: s(16); anchors.verticalCenter: parent.verticalCenter; color: _theme.surface0; radius: s(1) }
             }
             
             AnimWrap {
@@ -667,7 +667,7 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     height: parent.height
                     spacing: s(3) // Reducción de padding lateral para los íconos en top part
-                    Rectangle { width: s(2); height: s(16); anchors.verticalCenter: parent.verticalCenter; color: _theme.surface0; radius: 1;}
+                    Rectangle { width: s(2); height: s(16); anchors.verticalCenter: parent.verticalCenter; color: _theme.surface0; radius: s(1);}
                     ToolbarBtn { 
                         anchors.verticalCenter: parent.verticalCenter
                         iconTxt: "󰅖"; isDanger: true; onClicked: Qt.quit() 
@@ -690,7 +690,7 @@ PanelWindow {
             Rectangle {
                 id: leftLineBase
                 height: s(4) // Líneas horizontales más gruesas
-                radius: 1 // Radio escalado
+                radius: s(2) // Radio escalado
                 color: Qt.rgba(_theme.text.r, _theme.text.g, _theme.text.b, 0.1) // Subtle structural line
                 anchors.left: parent.left
                 anchors.leftMargin: s(24)
@@ -706,7 +706,7 @@ PanelWindow {
                     anchors.bottom: parent.bottom
                     // Stretches left when hovered
                     width: actionArea.containsMouse ? parent.width : 0
-                    radius: 1
+                    radius: s(2)
                     Behavior on width { NumberAnimation { duration: 500; easing.type: Easing.InOutExpo } }
                     
                     gradient: Gradient {
@@ -758,7 +758,7 @@ PanelWindow {
             Rectangle {
                 id: rightLineBase
                 height: s(4) // Líneas horizontales más gruesas
-                radius: 1 // Radio escalado
+                radius: s(2) // Radio escalado
                 color: Qt.rgba(_theme.text.r, _theme.text.g, _theme.text.b, 0.1)
                 anchors.right: parent.right
                 anchors.rightMargin: s(24)
@@ -774,7 +774,7 @@ PanelWindow {
                     anchors.bottom: parent.bottom
                     // Stretches right when hovered
                     width: actionArea.containsMouse ? parent.width : 0
-                    radius: 1
+                    radius: s(2)
                     Behavior on width { NumberAnimation { duration: 500; easing.type: Easing.InOutExpo } }
                     
                     gradient: Gradient {
@@ -800,7 +800,7 @@ PanelWindow {
             
             width: qrPopupLayout.implicitWidth + s(32)
             height: s(52)
-            radius: 0
+            radius: s(26)
             color: _theme.base
             border.color: model.qSuccess ? _theme.green : _theme.red
             border.width: s(2)
@@ -832,7 +832,7 @@ PanelWindow {
                     wrapMode: Text.NoWrap
                 }
 
-                Rectangle { visible: model.qSuccess; width: s(2); Layout.fillHeight: true; Layout.topMargin: s(10); Layout.bottomMargin: s(10); color: _theme.surface0; radius: 1 }
+                Rectangle { visible: model.qSuccess; width: s(2); Layout.fillHeight: true; Layout.topMargin: s(10); Layout.bottomMargin: s(10); color: _theme.surface0; radius: s(1) }
 
                 ToolbarBtn {
                     visible: model.qSuccess
@@ -852,7 +852,7 @@ PanelWindow {
                     }
                 }
 
-                Rectangle { width: s(2); Layout.fillHeight: true; Layout.topMargin: s(10); Layout.bottomMargin: s(10); color: _theme.surface0; radius: 1 }
+                Rectangle { width: s(2); Layout.fillHeight: true; Layout.topMargin: s(10); Layout.bottomMargin: s(10); color: _theme.surface0; radius: s(1) }
                 ToolbarBtn { iconTxt: "󰅖"; isDanger: true; onClicked: root.showQrPopup = false }
             }
         }

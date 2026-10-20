@@ -82,10 +82,10 @@ PanelWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 48
+        height: 0
 
-        anchors.leftMargin: (masterWindow.currentActive !== "hidden" && masterWindow.animX < 10 && masterWindow.animY < height) ? masterWindow.animW : 0
-        anchors.rightMargin: (masterWindow.currentActive !== "hidden" && (masterWindow.animX + masterWindow.animW) > (parent.width - 10) && masterWindow.animY < height) ? masterWindow.animW : 0
+        anchors.leftMargin: 0
+        anchors.rightMargin: 0
 
         Behavior on anchors.leftMargin {
             enabled: masterWindow.currentActive !== "hidden"
