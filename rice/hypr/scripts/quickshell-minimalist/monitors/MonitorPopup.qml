@@ -34,6 +34,9 @@ Item {
 
     ListModel { id: monitorsModel }
 
+    // header(22) + monList(56) + sep(1) + editArea(~145) + sep(1) + apply(36) + footer(26) + pad(13)
+    property real targetMasterHeight: 400
+
     property var resList: [
         {w: 3840, h: 2160, l: "4K"  },
         {w: 2560, h: 1440, l: "QHD" },
@@ -47,7 +50,7 @@ Item {
 
     property var ratesList: [60, 75, 100, 120, 144, 165, 180, 240, 360]
 
-    property int currentTransform:  monitorsModel.count > 0 ? monitorsModel.get(window.activeEditIndex).transform : 0
+    property int currentTransform:  monitorsModel.count > 0 ? monitorsModel.get(window.activeEditIndex).displayTransform : 0
     property bool currentIsPortrait: currentTransform === 1 || currentTransform === 3
 
     property real currentSimW: {
@@ -100,6 +103,9 @@ Item {
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (activeFocusIndex === 3) { window.applyPressed = true; window.triggerApply(); }
             event.accepted = true;
+        } else if (event.key === Qt.Key_Escape) {
+            Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "close"]);
+            event.accepted = true;
         }
     }
 
@@ -123,12 +129,12 @@ Item {
             monitorsModel.setProperty(window.activeEditIndex, "resH", window.resList[idx].h);
             delayedLayoutUpdate.restart();
         } else if (activeFocusIndex === 1) {
-            let t = monitorsModel.get(window.activeEditIndex).transform;
+            let t = monitorsModel.get(window.activeEditIndex).displayTransform;
             if (dir === "Up") t = 0;
             else if (dir === "Right") t = 1;
             else if (dir === "Down") t = 2;
             else if (dir === "Left") t = 3;
-            monitorsModel.setProperty(window.activeEditIndex, "transform", t);
+            monitorsModel.setProperty(window.activeEditIndex, "displayTransform", t);
             delayedLayoutUpdate.restart();
         } else if (activeFocusIndex === 2) {
             let cIdx = currentRateIndex();
@@ -148,7 +154,7 @@ Item {
         for (let i = 0; i < monitorsModel.count; i++) {
             if (i === skipIdx) continue;
             let m = monitorsModel.get(i);
-            let isP = m.transform === 1 || m.transform === 3;
+            let isP = m.displayTransform === 1 || m.displayTransform === 3;
             let mW = ((isP ? m.resH : m.resW) / m.sysScale) * window.uiScale;
             let mH = ((isP ? m.resW : m.resH) / m.sysScale) * window.uiScale;
             if (isOverlapping(x, y, w, h, m.uiX, m.uiY, mW, mH)) return true;
@@ -184,14 +190,14 @@ Item {
         if (monitorsModel.count < 2) return;
         let mIdx = window.activeEditIndex;
         let mModel = monitorsModel.get(mIdx);
-        let isP = mModel.transform === 1 || mModel.transform === 3;
+        let isP = mModel.displayTransform === 1 || mModel.displayTransform === 3;
         let mW = ((isP ? mModel.resH : mModel.resW) / mModel.sysScale) * window.uiScale;
         let mH = ((isP ? mModel.resW : mModel.resH) / mModel.sysScale) * window.uiScale;
         let bestX = mModel.uiX; let bestY = mModel.uiY; let bestDist = 999999;
         for (let i = 0; i < monitorsModel.count; i++) {
             if (i === mIdx) continue;
             let sModel = monitorsModel.get(i);
-            let sIsP = sModel.transform === 1 || sModel.transform === 3;
+            let sIsP = sModel.displayTransform === 1 || sModel.displayTransform === 3;
             let sW = ((sIsP ? sModel.resH : sModel.resW) / sModel.sysScale) * window.uiScale;
             let sH = ((sIsP ? sModel.resW : sModel.resH) / sModel.sysScale) * window.uiScale;
             let snapped = window.getPerimeterSnap(mModel.uiX, mModel.uiY, sModel.uiX, sModel.uiY, sW, sH, mW, mH, 20);
@@ -232,7 +238,7 @@ Item {
                             rate: Math.round(data[i].refreshRate).toString(),
                             uiX: (data[i].x - minX) * window.uiScale,
                             uiY: (data[i].y - minY) * window.uiScale,
-                            transform: tf,
+                            displayTransform: tf,
                             primary: false
                         });
                         if (data[i].focused) window.activeEditIndex = i;
@@ -270,7 +276,7 @@ Item {
         window.debugLog("================= NEW APPLY RUN =================");
         if (monitorsModel.count === 1) {
             let m = monitorsModel.get(0);
-            let jsonMonitorsArray = [{ name: m.name, resW: m.resW, resH: m.resH, rate: parseInt(m.rate), x: 0, y: 0, scale: m.sysScale, transform: m.transform, primary: m.primary }];
+            let jsonMonitorsArray = [{ name: m.name, resW: m.resW, resH: m.resH, rate: parseInt(m.rate), x: 0, y: 0, scale: m.sysScale, transform: m.displayTransform, primary: m.primary }];
             let safeJson = JSON.stringify(jsonMonitorsArray).replace(/'/g, "'\\''");
             let jsonCmd = "jq '.monitors = " + safeJson + "' ~/.config/hypr/settings.json > ~/.config/hypr/settings.json.tmp && mv ~/.config/hypr/settings.json.tmp ~/.config/hypr/settings.json";
             Quickshell.execDetached(["notify-send", "Display Update", "Applied & Saved: " + m.resW + "x" + m.resH + " @ " + m.rate + "Hz"]);
@@ -280,12 +286,12 @@ Item {
             let finalMinX = 999999; let finalMinY = 999999;
             for (let i = 0; i < monitorsModel.count; i++) {
                 let m = monitorsModel.get(i);
-                let isP = m.transform === 1 || m.transform === 3;
+                let isP = m.displayTransform === 1 || m.displayTransform === 3;
                 let physW = Math.round((isP ? m.resH : m.resW) / m.sysScale);
                 let physH = Math.round((isP ? m.resW : m.resH) / m.sysScale);
                 let rawX = m.uiX / window.uiScale;
                 let rawY = m.uiY / window.uiScale;
-                rects.push({ x: rawX, y: rawY, w: physW, h: physH, resW: m.resW, resH: m.resH, name: m.name, rate: m.rate, sysScale: m.sysScale, transform: m.transform, primary: m.primary });
+                rects.push({ x: rawX, y: rawY, w: physW, h: physH, resW: m.resW, resH: m.resH, name: m.name, rate: m.rate, sysScale: m.sysScale, transform: m.displayTransform, primary: m.primary });
             }
             function getTightSnap(pX, pY, sX, sY, sW, sH, mW, mH, t) {
                 let cx = pX; let cy = pY;
@@ -335,79 +341,126 @@ Item {
         label: "MONITORS"
         anchors.fill: parent
 
-        // ── MONITOR LIST ──────────────────────────────────────────────────────
+        // ── MONITOR CANVAS ────────────────────────────────────────────────────
         Item {
-            id: monListArea
+            id: monCanvas
             anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
-            height: Math.max(28, monitorsModel.count * 28)
+            height: 160
+
+            Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.25) }
+
+            // Bounding box of all monitors (in uiScale units)
+            property real _minX: { var mn=999999; for(var i=0;i<monitorsModel.count;i++) mn=Math.min(mn,monitorsModel.get(i).uiX); return mn<999999?mn:0; }
+            property real _minY: { var mn=999999; for(var i=0;i<monitorsModel.count;i++) mn=Math.min(mn,monitorsModel.get(i).uiY); return mn<999999?mn:0; }
+            property real _maxX: {
+                var mx=0;
+                for(var i=0;i<monitorsModel.count;i++){
+                    var m=monitorsModel.get(i); var p=m.displayTransform===1||m.displayTransform===3;
+                    mx=Math.max(mx, m.uiX+(p?m.resH:m.resW)*window.uiScale);
+                }
+                return mx;
+            }
+            property real _maxY: {
+                var mx=0;
+                for(var i=0;i<monitorsModel.count;i++){
+                    var m=monitorsModel.get(i); var p=m.displayTransform===1||m.displayTransform===3;
+                    mx=Math.max(mx, m.uiY+(p?m.resW:m.resH)*window.uiScale);
+                }
+                return mx;
+            }
+            // Fit-scale so monitors fill canvas with 14px padding
+            readonly property real fitScale: Math.min((width-28)/Math.max(_maxX-_minX,1), (height-28)/Math.max(_maxY-_minY,1))
+            // Center offset
+            readonly property real offX: (width  - (_maxX-_minX)*fitScale) / 2 - _minX*fitScale
+            readonly property real offY: (height - (_maxY-_minY)*fitScale) / 2 - _minY*fitScale
 
             Repeater {
                 model: monitorsModel
                 Item {
-                    width: monListArea.width; height: 28
-                    y: index * 28
                     required property string name
                     required property int    resW
                     required property int    resH
-                    required property string rate
-                    required property real   sysScale
-                    required property int    transform
+                    required property real   uiX
+                    required property real   uiY
+                    required property int    displayTransform
                     required property bool   primary
                     required property int    index
 
+                    property bool isPortrait: displayTransform === 1 || displayTransform === 3
+                    property real monW: (isPortrait ? resH : resW) * window.uiScale * monCanvas.fitScale
+                    property real monH: (isPortrait ? resW : resH) * window.uiScale * monCanvas.fitScale
                     property bool isActive: index === window.activeEditIndex
 
-                    property string transformStr: transform === 0 ? "0°" : transform === 1 ? "90°" : transform === 2 ? "180°" : "270°"
+                    x: uiX * monCanvas.fitScale + monCanvas.offX
+                    y: uiY * monCanvas.fitScale + monCanvas.offY
+                    width: monW; height: monH
 
                     Rectangle {
                         anchors.fill: parent
-                        color: isActive ? panel.accent : (monRowMa.containsMouse ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.08) : "transparent")
-                    }
-                    Rectangle {
-                        anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-                        width: 3; color: panel.accent
-                        opacity: isActive ? 1.0 : 0.0
+                        color: isActive
+                            ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.18)
+                            : Qt.rgba(0, 0, 0, 0.45)
+                        border.color: isActive ? panel.accent : panel.overlay0
+                        border.width: isActive ? 2 : 1
                     }
 
+                    // [N] name — top left
                     Text {
-                        anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter
-                        text: "[" + (index + 1) + "] " + name
-                        font.family: "JetBrains Mono"; font.pixelSize: 11
-                        color: isActive ? panel.bg : panel.fg
+                        anchors.top: parent.top; anchors.left: parent.left
+                        anchors.topMargin: 3; anchors.leftMargin: 4
+                        text: "[" + (index+1) + "] " + name
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: Math.max(7, Math.min(9, parent.width/14))
+                        color: isActive ? panel.accent : panel.dim
+                        elide: Text.ElideRight; width: parent.width - 8
                     }
+
+                    // Resolution — center
                     Text {
-                        anchors.right: rateLabel.left; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter
+                        anchors.centerIn: parent
                         text: resW + "×" + resH
-                        font.family: "JetBrains Mono"; font.pixelSize: 11
-                        color: isActive ? panel.bg : panel.dim
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: Math.max(7, Math.min(10, parent.width/12))
+                        color: panel.fg; opacity: 0.75
+                        visible: parent.width > 50
                     }
+
+                    // Orientation — bottom right
                     Text {
-                        id: rateLabel
-                        anchors.right: transformLabel.left; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter
-                        text: "@" + rate + "Hz"
-                        font.family: "JetBrains Mono"; font.pixelSize: 11
-                        color: isActive ? panel.bg : panel.dim
+                        anchors.bottom: parent.bottom; anchors.right: parent.right
+                        anchors.bottomMargin: 2; anchors.rightMargin: 4
+                        text: displayTransform === 0 ? "─" : displayTransform === 1 ? "↻90°" : displayTransform === 2 ? "180°" : "↺90°"
+                        font.family: "JetBrains Mono"; font.pixelSize: 7
+                        color: isActive ? panel.accent : panel.dim
                     }
+
+                    // PRIMARY star — top right
                     Text {
-                        id: transformLabel
-                        anchors.right: primaryLabel.left; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
-                        text: transformStr
-                        font.family: "JetBrains Mono"; font.pixelSize: 10
-                        color: isActive ? panel.bg : panel.dim
-                        width: 40; horizontalAlignment: Text.AlignRight
-                    }
-                    Text {
-                        id: primaryLabel
-                        anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                        text: primary ? "PRIMARY" : ""
-                        font.family: "JetBrains Mono"; font.pixelSize: 8
-                        color: isActive ? panel.bg : panel.accent
-                        width: 58; horizontalAlignment: Text.AlignRight
+                        anchors.top: parent.top; anchors.right: parent.right
+                        anchors.topMargin: 2; anchors.rightMargin: 4
+                        text: "★"; font.family: "JetBrains Mono"; font.pixelSize: 8
+                        color: isActive ? panel.hdrFg : panel.accent
+                        visible: primary
                     }
 
                     MouseArea {
-                        id: monRowMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: window.activeEditIndex = index
+                        id: monDragMa; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: (pressed && monitorsModel.count > 1) ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                        property real _cx: 0; property real _cy: 0
+                        property real _ux: 0; property real _uy: 0
+                        onPressed: {
+                            window.activeEditIndex = index;
+                            var pt = mapToItem(monCanvas, mouseX, mouseY);
+                            _cx = pt.x; _cy = pt.y; _ux = uiX; _uy = uiY;
+                        }
+                        onPositionChanged: {
+                            if (pressed && monitorsModel.count > 1) {
+                                var pt = mapToItem(monCanvas, mouseX, mouseY);
+                                monitorsModel.setProperty(index, "uiX", _ux + (pt.x - _cx) / monCanvas.fitScale);
+                                monitorsModel.setProperty(index, "uiY", _uy + (pt.y - _cy) / monCanvas.fitScale);
+                            }
+                        }
+                        onReleased: { if (monitorsModel.count > 1) delayedLayoutUpdate.restart(); }
                     }
                 }
             }
@@ -415,14 +468,14 @@ Item {
 
         Rectangle {
             id: monListSep
-            anchors.top: monListArea.bottom; anchors.left: parent.left; anchors.right: parent.right
+            anchors.top: monCanvas.bottom; anchors.left: parent.left; anchors.right: parent.right
             height: 1; color: panel.sep
         }
 
         // ── EDIT AREA ─────────────────────────────────────────────────────────
         Item {
             id: editArea
-            anchors.top: monListSep.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: applySection.top
+            anchors.top: monListSep.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: 62
 
             // ── RESOLUTION GRID ───────────────────────────────────────────────
             Item {
@@ -515,7 +568,7 @@ Item {
                             required property var modelData
 
                             property bool isCurrent: monitorsModel.count > 0 &&
-                                                     monitorsModel.get(window.activeEditIndex).transform === modelData.tf
+                                                     monitorsModel.get(window.activeEditIndex).displayTransform === modelData.tf
 
                             Rectangle {
                                 anchors.fill: parent
@@ -527,7 +580,7 @@ Item {
                                 id: tfMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     window.activeFocusIndex = 1;
-                                    monitorsModel.setProperty(window.activeEditIndex, "transform", modelData.tf);
+                                    monitorsModel.setProperty(window.activeEditIndex, "displayTransform", modelData.tf);
                                     delayedLayoutUpdate.restart();
                                 }
                             }
@@ -575,14 +628,14 @@ Item {
 
         Rectangle {
             id: applySep
-            anchors.bottom: applySection.top; anchors.left: parent.left; anchors.right: parent.right
+            anchors.bottom: parent.bottom; anchors.bottomMargin: 62; anchors.left: parent.left; anchors.right: parent.right
             height: 1; color: panel.sep
         }
 
         // ── APPLY BUTTON ──────────────────────────────────────────────────────
         Item {
             id: applySection
-            anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
+            anchors.bottom: parent.bottom; anchors.bottomMargin: 26; anchors.left: parent.left; anchors.right: parent.right
             height: 36
 
             Item {
@@ -611,6 +664,26 @@ Item {
                     onPressed: { window.applyPressed = true; window.triggerApply(); }
                     onReleased: { window.applyPressed = false; }
                 }
+            }
+        }
+
+        // ── FOOTER ────────────────────────────────────────────────────────────
+        Item {
+            id: monFooter
+            anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
+            height: 26
+            Rectangle { anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: panel.sep }
+            Row {
+                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; anchors.leftMargin: 10
+                spacing: 0
+                Text { text: "Tab";      font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.accent }
+                Text { text: " focus  "; font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.dim }
+                Text { text: "↑↓←→";   font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.accent }
+                Text { text: " change  "; font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.dim }
+                Text { text: "Enter";   font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.accent }
+                Text { text: " apply  "; font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.dim }
+                Text { text: "Esc";     font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.accent }
+                Text { text: " close";  font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.dim }
             }
         }
     }
