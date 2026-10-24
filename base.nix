@@ -208,6 +208,7 @@ swaynotificationcenter
 hyprlock
 hyprpolkitagent
 hypridle
+awww
 quickshell
 cliphist
 thunar
