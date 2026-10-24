@@ -226,6 +226,7 @@ openvpn
 libxml2
 neovim
 vim
+pulseaudio
 python3
 nodejs_24
 bun
