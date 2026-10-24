@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-
-if hyprctl getoption decoration:blur:enabled | grep "int: 1" > /dev/null; then
-    hyprctl keyword decoration:blur:enabled false > /dev/null
-else
-    hyprctl keyword decoration:blur:enabled true > /dev/null
-fi
+# Blur/shadow toggle is not supported in niri — this script is a no-op.
+# Niri does not have per-compositor blur options.
+exit 0

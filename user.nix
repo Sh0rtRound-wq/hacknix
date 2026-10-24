@@ -33,9 +33,11 @@ in
     shellAliases = {};
     loginExtra = ''
       if [ "$(tty)" = "/dev/tty1" ]; then
-        exec uwsm start hyprland-uwsm.desktop
+        exec niri-session -l
       fi
     '';
+    # NOTE: loginExtra is silently dropped when dotDir = homeDirectory (absolute path HM bug).
+    # home.file.".zprofile" below deploys it directly as a workaround.
     initContent = builtins.readFile ./rice/zsh/zsh-init.sh;
   };
 
@@ -46,6 +48,16 @@ in
     '';
     initExtra = ''
       PS1='\[\033[0;32m\]\u@\h\[\033[0m\]:\[\033[0;34m\]\w\[\033[0m\] \[\033[0;32m\]❯\[\033[0m\] '
+    '';
+  };
+
+  # Workaround: dotDir = absolute path causes HM to skip .zprofile generation
+  home.file.".zprofile" = {
+    force = true;
+    text = ''
+      if [ "$(tty)" = "/dev/tty1" ]; then
+        exec niri-session -l
+      fi
     '';
   };
 
@@ -171,7 +183,7 @@ in
       margin-bottom = 0;
       margin-left   = 0;
       margin-right  = 0;
-      modules-left   = [ "custom/launcher" "hyprland/workspaces" "tray" ];
+      modules-left   = [ "custom/launcher" "niri/workspaces" "tray" ];
       modules-center = [ "clock" ];
       modules-right  = [
         "cpu" "memory" "pulseaudio" "network" "battery"
@@ -184,29 +196,24 @@ in
         format-alt     = "{:%d/%m}";
         calendar.format.today = "<span color='#00FF41'><b>{}</b></span>";
       };
-      "hyprland/workspaces" = {
-        active-only    = false;
-        disable-scroll = true;
-        format         = "{icon}";
-        on-click       = "activate";
+      "niri/workspaces" = {
+        format = "{icon}";
         format-icons = {
           "1" = "I"; "2" = "II"; "3" = "III"; "4" = "IV"; "5" = "V";
           "6" = "VI"; "7" = "VII"; "8" = "VIII"; "9" = "IX"; "10" = "X";
-          sort-by-number = true;
-        };
-        persistent-workspaces = {
-          "1" = []; "2" = []; "3" = []; "4" = []; "5" = [];
+          active = "";
+          empty  = "";
         };
       };
       cpu = {
         format   = "<span foreground='#00FF41'> </span> {usage}%";
         interval = 2;
-        on-click-right = "hyprctl dispatch exec '[float; center; size 950 650] kitty --override font_size=14 --title float_kitty btop'";
+        on-click-right = "kitty --override font_size=14 --title float_kitty btop";
       };
       memory = {
         format   = "<span foreground='#00CC33'>󰟜 </span>{}%";
         interval = 2;
-        on-click-right = "hyprctl dispatch exec '[float; center; size 950 650] kitty --override font_size=14 --title float_kitty btop'";
+        on-click-right = "kitty --override font_size=14 --title float_kitty btop";
       };
       network = {
         format-wifi         = "<span foreground='#00FF41'> </span> {signalStrength}%";
@@ -325,43 +332,13 @@ in
     '';
   };
 
-  # ── Hyprland ──────────────────────────────────────────────────────────
-  # rules.conf and variables.conf are static — deployed as read-only symlinks.
-  # settings.conf, autostart.conf, keybindings.conf, monitors.conf, env.conf
-  # are generated at runtime by settings_watcher.sh from templates/.
-  # colors.conf is generated at runtime by matugen.
-  xdg.configFile."hypr/config/rules.conf".source     = ./rice/hypr/config/rules.conf;
-  xdg.configFile."hypr/config/variables.conf".source = ./rice/hypr/config/variables.conf;
-  xdg.configFile."hypr/templates" = {
-    source    = ./rice/hypr/templates;
-    recursive = true;
-  };
+  # ── Hypr scripts (settings_watcher, lock, QS, etc.) ─────────────────
   xdg.configFile."hypr/scripts" = {
     source    = ./rice/hypr/scripts;
     recursive = true;
   };
-  wayland.windowManager.hyprland = {
-    enable        = true;
-    package       = null;
-    portalPackage = null;
-    xwayland.enable = true;
-    systemd.enable  = true;
-    extraConfig = ''
-      source = ~/.config/hypr/colors.conf
-
-      submap = passthru
-      bind = SUPER SHIFT CTRL ALT, F35, exec, true
-      submap = reset
-
-      source = ~/.config/hypr/config/monitors.conf
-      source = ~/.config/hypr/config/env.conf
-      source = ~/.config/hypr/config/autostart.conf
-      source = ~/.config/hypr/config/variables.conf
-      source = ~/.config/hypr/config/settings.conf
-      source = ~/.config/hypr/config/rules.conf
-      source = ~/.config/hypr/config/keybindings.conf
-    '';
-  };
+  # ── Niri config template deployment ──────────────────────────────────
+  xdg.configFile."niri/templates/config.kdl.template".source = ./rice/niri/templates/config.kdl.template;
 
   # ── Hyprlock ──────────────────────────────────────────────────────────
   programs.hyprlock = {
@@ -421,11 +398,30 @@ in
     };
   };
 
+  # ── Niri smart-width daemon ───────────────────────────────────────────
+  systemd.user.services.niri-smart-width = {
+    Unit = {
+      Description = "Niri smart column width daemon";
+      After       = [ "graphical-session.target" ];
+      PartOf      = [ "graphical-session.target" ];
+    };
+    Service = {
+      Type        = "simple";
+      Environment = "PATH=/run/current-system/sw/bin:/run/wrappers/bin";
+      ExecStart   = "/run/current-system/sw/bin/python3 %h/.config/hypr/scripts/niri-smart-width.py";
+      Restart     = "on-failure";
+      RestartSec  = "1";
+    };
+    Install = {
+      WantedBy = [ "graphical-session.target" ];
+    };
+  };
+
   # ── Quickshell systemd user service ───────────────────────────────────
   systemd.user.services.quickshell = {
     Unit = {
       Description = "Quickshell compositor shell";
-      After       = [ "hyprland-session.target" ];
+      After       = [ "graphical-session.target" ];
       PartOf      = [ "graphical-session.target" ];
     };
     Service = {
@@ -436,13 +432,14 @@ in
       RestartSec  = "1";
     };
     Install = {
-      WantedBy = [ "hyprland-session.target" ];
+      WantedBy = [ "graphical-session.target" ];
     };
   };
 
   # ── Wallpapers + Scripts ───────────────────────────────────────────────
   home.activation.setupRice = lib.hm.dag.entryAfter ["linkGeneration"] ''
-    mkdir -p "$HOME/.config/hypr/config"
+    mkdir -p "$HOME/.config/hypr"
+    mkdir -p "$HOME/.config/niri/templates"
 
     if [ ! -f "$HOME/.config/hypr/colors.conf" ]; then
       echo '$active_border = rgba(00FF41ee)' > "$HOME/.config/hypr/colors.conf"
@@ -487,16 +484,8 @@ PYEOF
 
     bash "$HOME/.config/hypr/scripts/settings_watcher.sh" --compile || true
 
-    # Force Hyprland reload — HYPRLAND_INSTANCE_SIGNATURE isn't set in activation context
-    # so hyprctl inside settings_watcher silently fails. Enumerate the socket dir instead.
-    _hypr_sock_dir="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr"
-    if [ -d "$_hypr_sock_dir" ]; then
-      for _inst_dir in "$_hypr_sock_dir"/*/; do
-        [ -d "$_inst_dir" ] || continue
-        _inst=$(basename "$_inst_dir")
-        HYPRLAND_INSTANCE_SIGNATURE="$_inst" hyprctl reload 2>/dev/null && break
-      done
-    fi
+    # Reload niri config if niri is running
+    niri msg action load-config-file 2>/dev/null || true
 
     mkdir -p "$HOME/.local/bin"
     for f in ${./rice/scripts}/*.sh; do

@@ -2,9 +2,9 @@
 
 # Deepen accent colors post-matugen
 python3 "${HOME}/.config/hypr/scripts/deepen-colors.py"
-# Reload Hyprland borders
-sig=$(ls /run/user/1000/hypr/ 2>/dev/null | head -1)
-[ -n "$sig" ] && XDG_RUNTIME_DIR=/run/user/1000 HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl reload &
+# Regenerate niri config with new matugen colors, then reload
+bash "${HOME}/.config/hypr/scripts/settings_watcher.sh" --compile
+niri msg action load-config-file 2>/dev/null &
 
 
 # Boost terminal colors to neon/vivid variants (kitty only)

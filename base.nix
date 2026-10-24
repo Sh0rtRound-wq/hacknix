@@ -87,16 +87,12 @@ in
     LC_TELEPHONE      = "en_US.UTF-8";
     LC_TIME           = "en_US.UTF-8";
   };
-  programs.hyprland = {
-    enable          = true;
-    withUWSM        = true;
-    xwayland.enable = true;
-  };
+  programs.niri.enable = true;
   programs.uwsm.enable = true;
   programs.zsh.enable = true;
   programs.bash.loginShellInit = ''
     if [ "$(tty)" = "/dev/tty1" ]; then
-      exec uwsm start hyprland-uwsm.desktop
+      exec niri-session -l
     fi
   '';
 
@@ -106,8 +102,6 @@ in
     ""
     "@${pkgs.util-linux}/sbin/agetty agetty --login-program ${pkgs.shadow}/bin/login --autologin ${homeUser} --noclear %I $TERM"
   ];
-  environment.sessionVariables.HYPRLAND_NO_SD_NOTIFY  = "1";
-  environment.variables.HYPRLAND_NO_UWSM_CHECK = "1";
   services.xserver.xkb = { layout = "us"; variant = ""; };
   environment.etc."xdg/kitty/kitty.conf".text = ''
     confirm_os_window_close 0
@@ -127,11 +121,10 @@ in
     enable           = true;
     xdgOpenUsePortal = true;
     config = {
-      common.default   = [ "gtk" ];
-      hyprland.default = [ "gtk" "hyprland" ];
+      common.default = [ "gnome" "gtk" ];
     };
     extraPortals = with pkgs; [
-      xdg-desktop-portal-hyprland
+      xdg-desktop-portal-gnome
       xdg-desktop-portal-gtk
     ];
   };
@@ -171,7 +164,6 @@ in
     })
   ];
   environment.systemPackages = with pkgs; [
-foot
 kitty
 zsh
 fzf
@@ -216,7 +208,6 @@ swaynotificationcenter
 hyprlock
 hyprpolkitagent
 hypridle
-awww
 quickshell
 cliphist
 thunar
@@ -240,7 +231,6 @@ nodejs_24
 bun
 ruby
 php
-go
 android-tools
 docker
 docker-compose
@@ -258,7 +248,6 @@ xclip
 vlc
 ntp
 systemdUkify
-firefox-esr
 busybox
 p7zip
 bottles
@@ -267,8 +256,8 @@ bluez
 bluez-tools
 speedtest-go
 ffmpeg
-pulseaudio
 hyprshot
+xwayland-satellite
 protontricks
 jdk17
 jdk21

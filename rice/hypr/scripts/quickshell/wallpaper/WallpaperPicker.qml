@@ -87,7 +87,7 @@ Item {
 
     Process {
         id: monitorProc
-        command: ["sh", "-c", "export PATH=$PATH:/usr/bin:/usr/local/bin:/run/current-system/sw/bin && hyprctl monitors -j"]
+        command: ["niri", "msg", "-j", "outputs"]
         running: false
         
         stdout: StdioCollector {
@@ -117,7 +117,7 @@ Item {
     }
 
     function loadMonitors() {
-        console.log("[MonitorSync] Starting native hyprctl process...");
+        console.log("[MonitorSync] Starting niri outputs process...");
         monitorProc.running = true;
     }
 

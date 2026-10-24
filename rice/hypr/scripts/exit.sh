@@ -5,4 +5,4 @@ systemctl --user stop graphical-session-pre.target
 
 sleep 0.5
 
-hyprctl dispatch exit
+niri msg action quit

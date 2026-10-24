@@ -5,7 +5,7 @@ MATUGEN=matugen
 
 # Start awww daemon if not running
 if ! pgrep -x awww-daemon > /dev/null; then
-    $SWWW-daemon --no-cache &
+    $SWWW-daemon &
 
     # Wait until the daemon is ready
     while ! $SWWW query > /dev/null 2>&1; do

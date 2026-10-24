@@ -90,7 +90,7 @@ Item {
     // ── MONITOR PROCESS ───────────────────────────────────────────────────────
     Process {
         id: monitorProc
-        command: ["sh", "-c", "export PATH=$PATH:/usr/bin:/usr/local/bin:/run/current-system/sw/bin && hyprctl monitors -j"]
+        command: ["niri", "msg", "-j", "outputs"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
