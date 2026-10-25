@@ -398,24 +398,6 @@ in
     };
   };
 
-  # ── Niri smart-width daemon ───────────────────────────────────────────
-  systemd.user.services.niri-smart-width = {
-    Unit = {
-      Description = "Niri smart column width daemon";
-      After       = [ "graphical-session.target" ];
-      PartOf      = [ "graphical-session.target" ];
-    };
-    Service = {
-      Type        = "simple";
-      Environment = "PATH=/run/current-system/sw/bin:/run/wrappers/bin";
-      ExecStart   = "/run/current-system/sw/bin/python3 %h/.config/hypr/scripts/niri-smart-width.py";
-      Restart     = "on-failure";
-      RestartSec  = "1";
-    };
-    Install = {
-      WantedBy = [ "graphical-session.target" ];
-    };
-  };
 
   # ── Quickshell systemd user service ───────────────────────────────────
   systemd.user.services.quickshell = {

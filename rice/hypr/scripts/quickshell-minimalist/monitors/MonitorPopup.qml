@@ -68,14 +68,18 @@ Item {
     }
     
     property var resList: [
-        {w: 3840, h: 2160, l: "4K",   accent: window.pink}, 
+        {w: 3840, h: 2160, l: "4K",   accent: window.pink},
+        {w: 2560, h: 1600, l: "WQXGA",accent: window.mauve},
         {w: 2560, h: 1440, l: "QHD",  accent: window.mauve},
+        {w: 1920, h: 1200, l: "WUXGA",accent: window.blue},
         {w: 1920, h: 1080, l: "FHD",  accent: window.blue},
-        {w: 1600, h: 900,  l: "HD+",  accent: window.teal}, 
-        {w: 1366, h: 768,  l: "WXGA", accent: window.yellow}, 
-        {w: 1280, h: 720,  l: "HD",   accent: window.peach}, 
-        {w: 1024, h: 768,  l: "XGA",  accent: window.green}, 
-        {w: 800,  h: 600,  l: "SVGA", accent: window.red} 
+        {w: 1680, h: 1050, l: "WSXGA+",accent: window.sapphire},
+        {w: 1600, h: 900,  l: "HD+",  accent: window.teal},
+        {w: 1440, h: 900,  l: "WXGA+",accent: window.teal},
+        {w: 1366, h: 768,  l: "WXGA", accent: window.yellow},
+        {w: 1280, h: 800,  l: "WSVGA",accent: window.peach},
+        {w: 1280, h: 720,  l: "HD",   accent: window.peach},
+        {w: 1024, h: 768,  l: "XGA",  accent: window.green}
     ]
 
     property color selectedResAccent: window.mauve
@@ -162,9 +166,9 @@ Item {
             }
             
             if (dir === "Left" && idx % 2 !== 0) idx--;
-            else if (dir === "Right" && idx % 2 === 0 && idx < 7) idx++;
+            else if (dir === "Right" && idx % 2 === 0 && idx + 1 < window.resList.length) idx++;
             else if (dir === "Up" && idx >= 2) idx -= 2;
-            else if (dir === "Down" && idx <= 5) idx += 2;
+            else if (dir === "Down" && idx + 2 < window.resList.length) idx += 2;
 
             window.selectedResAccent = window.resList[idx].accent;
             monitorsModel.setProperty(window.activeEditIndex, "resW", window.resList[idx].w);

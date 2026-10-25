@@ -43,7 +43,7 @@ layout {
         proportion 0.5
         proportion 0.66667
     }
-    default-column-width { proportion 1.0; }
+    default-column-width { proportion 0.5; }
 
     focus-ring {
         width 4
@@ -75,6 +75,11 @@ cursor {
 // ─── Animations ──────────────────────────────────────────────────────────────
 animations {
     slowdown 0.8
+    // Viewport scroll on focus/window-open is instant — prevents the
+    // "switching workspace" look when a new window opens to the right.
+    horizontal-view-movement {
+        off
+    }
 }
 
 // ─── Environment Variables ───────────────────────────────────────────────────

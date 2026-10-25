@@ -115,7 +115,10 @@ compile_settings() {
 
             {
                 printf 'output "%s" {\n' "$MON_NAME"
-                printf '    mode "%sx%s@%s"\n' "$MON_W" "$MON_H" "$MON_RATE"
+                # Omit refresh rate — let niri auto-select the highest available rate.
+                # Including an integer Hz (e.g. "@60") causes silent mode rejection when
+                # the panel's actual rate in mHz doesn't match exactly (e.g. 59951 != 60000).
+                printf '    mode "%sx%s"\n' "$MON_W" "$MON_H"
                 printf '    position x=%s y=%s\n' "$MON_X" "$MON_Y"
                 printf '    scale %s\n' "$MON_SCALE"
                 printf '    transform "%s"\n' "$MON_TRANSFORM"
@@ -224,7 +227,7 @@ PYEOF
     mv "$TMP_CONFIG" "$NIRI_CONFIG"
     echo "Niri config updated."
 
-    if niri msg action load-config-file 2>/dev/null; then
+    if /run/current-system/sw/bin/niri msg action load-config-file 2>/dev/null; then
         echo "Niri config reloaded."
     else
         echo "Niri not running — config will be picked up on next start."

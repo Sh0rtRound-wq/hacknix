@@ -361,6 +361,10 @@ exfatprogs
 
   services.printing.enable             = false;
   programs.dconf.enable                = true;
+  # Disable systemd-oomd — it aggressively kills desktop apps (Steam, Discord, etc.)
+  # under memory pressure. The kernel OOM killer is sufficient.
+  systemd.oomd.enable = false;
+
   virtualisation.libvirtd.enable = true;
   virtualisation.docker.enable   = true;
   hardware.graphics.enable       = true;

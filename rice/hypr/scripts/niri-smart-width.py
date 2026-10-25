@@ -10,6 +10,11 @@ Behaviour per workspace:
 
   i.e. odd-positioned columns = solo, even-positioned = pairs with previous
 
+Resize strategy:
+  niri's horizontal-view-movement animation is disabled in config.kdl, so
+  focus-column-left/right are instant — no visible viewport pan. Both windows
+  are resized immediately on open.
+
 Socket auto-discovery handles systemd user service (no NIRI_SOCKET inherited).
 """
 
@@ -60,15 +65,24 @@ def niri_action(*args: str) -> None:
 
 
 def handle_new_window(win_id: int) -> None:
-    # Brief settle — niri needs a moment to assign layout positions
-    time.sleep(0.15)
+    # Poll until the new window is focused AND has a layout position.
+    # Niri places the window before focusing it — if we act before focus
+    # lands on win_id, focus-column-left fires from the wrong column.
+    # Max 20 × 5ms = 100ms fallback.
+    target = None
+    pos = None
+    windows = None
+    for _ in range(20):
+        windows = niri_json(["windows"])
+        if windows:
+            target = next((w for w in windows if w.get("id") == win_id), None)
+            if target:
+                pos = target.get("layout", {}).get("pos_in_scrolling_layout")
+                if pos and target.get("is_focused", False):
+                    break
+        time.sleep(0.005)
 
-    windows = niri_json(["windows"])
-    if not windows:
-        return
-
-    target = next((w for w in windows if w.get("id") == win_id), None)
-    if not target:
+    if not target or not pos:
         return
 
     # Skip floating windows
@@ -79,20 +93,15 @@ def handle_new_window(win_id: int) -> None:
     if ws_id is None:
         return
 
-    layout = target.get("layout", {})
-    pos = layout.get("pos_in_scrolling_layout")
-    if not pos:
-        return
-
     new_col = round(pos[0])
 
     # All non-floating windows on this workspace
     ws_windows = [
-        w for w in windows
+        w for w in (windows or [])
         if w.get("workspace_id") == ws_id and not w.get("is_floating", False)
     ]
 
-    # Build col_index → window_id map (one window per column assumed; take any)
+    # Build col_x → window_id map
     col_to_id: dict[int, int] = {}
     for w in ws_windows:
         p = w.get("layout", {}).get("pos_in_scrolling_layout")
@@ -103,8 +112,7 @@ def handle_new_window(win_id: int) -> None:
     # Find the immediately left column
     left_cols = [k for k in col_to_id if k < new_col]
     if not left_cols:
-        # First window on workspace — solo, nothing to do
-        return
+        return  # first window on workspace — solo
 
     left_col = max(left_cols)
     left_id = col_to_id[left_col]
@@ -113,16 +121,13 @@ def handle_new_window(win_id: int) -> None:
     if left_id in paired_ids:
         return
 
-    # Left neighbor is solo → pair them
-    # Focused window is the new one (rightmost). Set it to 50%, move left, set 50%, return.
-    niri_action("set-column-width", "50%")
-    time.sleep(0.05)
+    # Left neighbor is solo → pair them.
+    # horizontal-view-movement is disabled in niri config so focus changes
+    # are instant — no visible viewport pan.
     niri_action("focus-column-left")
-    time.sleep(0.05)
     niri_action("set-column-width", "50%")
-    time.sleep(0.05)
     niri_action("focus-column-right")
-    time.sleep(0.05)
+    niri_action("set-column-width", "50%")
     niri_action("center-visible-columns")
 
     paired_ids.add(win_id)

@@ -282,7 +282,8 @@ if [ -f "$USER_SETTINGS_JSON" ]; then
     echo "Niri config recompiled."
   fi
 
-  # Reload niri if running
-  sudo -u "$CURRENT_USER" niri msg action load-config-file 2>/dev/null && \
+  # Reload niri if running (full path needed — root's PATH omits /run/current-system/sw/bin)
+  sudo -u "$CURRENT_USER" env PATH="/run/current-system/sw/bin:/run/wrappers/bin:$PATH" \
+    niri msg action load-config-file 2>/dev/null && \
     echo "Niri config reloaded." || echo "Niri not running — config will be picked up on next start."
 fi
