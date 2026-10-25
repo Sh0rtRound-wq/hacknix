@@ -227,7 +227,7 @@ Item {
             if (m.transform !== 0) monitorStr += ",transform," + m.transform;
             let jsonArr = [{ name: m.name, resW: m.resW, resH: m.resH, rate: parseInt(m.rate), x: 0, y: 0, scale: m.sysScale, transform: m.transform }];
             config.setSetting("monitors", jsonArr);
-            config.sh("awww kill ; sleep 0.2 ; awww-daemon &");
+            config.sh("pkill swaybg 2>/dev/null; swaybg -i \"$(cat $HOME/.config/hypr/wallpaper)\" -m fill &");
             Quickshell.execDetached(["notify-send", "Display Update", "Applied: " + m.resW + "x" + m.resH + " @ " + m.rate + "Hz"]);
         } else {
             let rects = [];
@@ -277,7 +277,7 @@ Item {
                 jsonArr.push({ name: r.name, resW: r.resW, resH: r.resH, rate: parseInt(r.rate), x: r.x, y: r.y, scale: r.sysScale, transform: r.transform });
             }
             config.setSetting("monitors", jsonArr);
-            config.sh("awww kill ; sleep 0.2 ; awww-daemon &");
+            config.sh("pkill swaybg 2>/dev/null; swaybg -i \"$(cat $HOME/.config/hypr/wallpaper)\" -m fill &");
             Quickshell.execDetached(["notify-send", "Display Update", "Applied layout for: " + summaryString.trim()]);
         }
     }

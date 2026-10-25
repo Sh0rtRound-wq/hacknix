@@ -412,6 +412,7 @@ in
       ExecStart   = "${pkgs.bash}/bin/bash -c 'exec quickshell -p %h/.config/hypr/scripts/quickshell-$(cat %h/.config/hypr/.qs_theme 2>/dev/null || printf modern)/Shell.qml'";
       Restart     = "always";
       RestartSec  = "1";
+      MemoryMax   = "4G";  # cap the QML memory leak — kills+restarts before it OOMs the session
     };
     Install = {
       WantedBy = [ "graphical-session.target" ];

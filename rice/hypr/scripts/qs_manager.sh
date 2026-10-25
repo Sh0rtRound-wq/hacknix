@@ -183,8 +183,8 @@ if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
         CURRENT_SRC=""
         if pgrep -a "mpvpaper" > /dev/null; then
             CURRENT_SRC=$(pgrep -a mpvpaper | grep -o "$SRC_DIR/[^' ]*" | head -n1)
-        elif command -v awww >/dev/null; then
-            CURRENT_SRC=$(awww query 2>/dev/null | grep -o "$SRC_DIR/[^ ]*" | head -n1)
+        elif [ -f "$HOME/.config/hypr/wallpaper" ]; then
+            CURRENT_SRC=$(cat "$HOME/.config/hypr/wallpaper" 2>/dev/null)
         fi
 
         TARGET_THUMB=""

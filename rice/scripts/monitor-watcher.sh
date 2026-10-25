@@ -2,7 +2,7 @@
 # Auto-manage monitors when external displays connect/disconnect via niri
 
 restart-apps() {
-    pkill .awww-daemon-wr 2>/dev/null
+    pkill swaybg 2>/dev/null
     init-wallpaper &
 
     pkill .waybar-wrapped 2>/dev/null
