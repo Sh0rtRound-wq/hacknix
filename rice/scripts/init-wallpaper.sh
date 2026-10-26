@@ -25,9 +25,12 @@ if [ -z "$WALLPAPER" ] || [ ! -f "$WALLPAPER" ]; then
     exit 1
 fi
 
-# Set wallpaper (swaybg: no daemon needed, kill any existing instance and respawn)
-pkill swaybg 2>/dev/null
-swaybg -i "$WALLPAPER" -m fill &
+# Restart swaybg service (reads wallpaper path on start)
+systemctl --user restart swaybg.service 2>/dev/null || {
+    # Fallback if systemd service not available yet
+    pkill swaybg 2>/dev/null
+    swaybg -i "$WALLPAPER" -m fill &
+}
 
 # Generate color theme from wallpaper — always runs
 $MATUGEN image --type scheme-vibrant --contrast 1.0 --source-color-index 0 "$WALLPAPER"

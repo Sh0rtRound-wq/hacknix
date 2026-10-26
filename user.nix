@@ -393,6 +393,7 @@ in
       general = {
         lock_cmd         = "pidof hyprlock || hyprlock";
         before_sleep_cmd = "loginctl lock-session";
+        after_sleep_cmd  = "pidof hyprlock || hyprlock";  # relaunch lock if it died during suspend
       };
       listener = [];
     };
@@ -405,6 +406,7 @@ in
       Description = "Quickshell compositor shell";
       After       = [ "graphical-session.target" ];
       PartOf      = [ "graphical-session.target" ];
+      X-RestartIfChanged = "false";  # don't bounce on nixos-rebuild — kills all child apps
     };
     Service = {
       Type        = "simple";
@@ -412,7 +414,31 @@ in
       ExecStart   = "${pkgs.bash}/bin/bash -c 'exec quickshell -p %h/.config/hypr/scripts/quickshell-$(cat %h/.config/hypr/.qs_theme 2>/dev/null || printf modern)/Shell.qml'";
       Restart     = "always";
       RestartSec  = "1";
-      MemoryMax   = "4G";  # cap the QML memory leak — kills+restarts before it OOMs the session
+      OOMScoreAdjust = "-100"; # don't let kernel pick QS as OOM victim
+      # NOTE: Do NOT set MemoryMax here — child processes launched from quickshell
+      # (Steam, games, apps) inherit the cgroup limit. A 4G cap kills the whole
+      # game + quickshell together. Let OOMScoreAdjust protect QS instead.
+    };
+    Install = {
+      WantedBy = [ "graphical-session.target" ];
+    };
+  };
+
+  # ── swaybg wallpaper service ──────────────────────────────────────────
+  systemd.user.services.swaybg = {
+    Unit = {
+      Description = "Wallpaper (swaybg)";
+      After       = [ "graphical-session.target" ];
+      PartOf      = [ "graphical-session.target" ];
+      X-RestartIfChanged = "false";
+    };
+    Service = {
+      Type        = "simple";
+      ExecStart   = "${pkgs.bash}/bin/bash -c 'exec swaybg -i \"$(cat %h/.config/hypr/wallpaper 2>/dev/null || echo %h/hacknix/wallpapers/computer.png)\" -m fill'";
+      Environment = "PATH=/run/current-system/sw/bin";
+      Restart     = "always";
+      RestartSec  = "1";
+      OOMScoreAdjust = "-500";  # wallpaper is cheap — never kill it
     };
     Install = {
       WantedBy = [ "graphical-session.target" ];

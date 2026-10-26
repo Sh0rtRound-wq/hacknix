@@ -68,6 +68,13 @@ in
   powerManagement.cpuFreqGovernor  = if powerProfile == "performance" then "performance"
                                      else if powerProfile == "balanced"   then "schedutil"
                                      else "powersave";
+  # ── Logind / lid / power button ──────────────────────────────────────
+  services.logind.settings.Login = {
+    HandleLidSwitch       = "suspend";
+    HandleLidSwitchDocked = "ignore";
+    HandlePowerKey        = "poweroff";
+  };
+
   networking.hostName = hostname;
   networking.networkmanager.enable = true;
   networking.networkmanager.wifi.macAddress = "random";

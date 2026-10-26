@@ -3,11 +3,11 @@ reload_apps = false
 
 [templates.quickshell]
 input_path  = "~/.config/matugen/templates/qs_colors.json.template"
-output_path = "/tmp/qs_colors.json"
+output_path = "~/.cache/matugen/qs_colors.json"
 
 [templates.kitty]
 input_path  = "~/.config/matugen/templates/kitty-colors.conf.template"
-output_path = "/tmp/kitty-matugen-colors.conf"
+output_path = "~/.cache/matugen/kitty-matugen-colors.conf"
 
 [templates.discord]
 input_path  = "~/.config/matugen/templates/discord.css.template"

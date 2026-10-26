@@ -33,7 +33,7 @@ Item {
 
     Process {
         id: themeReader
-        command: ["cat", "/tmp/qs_colors.json"]
+        command: ["bash", "-c", "cat ~/.cache/matugen/qs_colors.json"]
         stdout: StdioCollector {
             onStreamFinished: {
                 let txt = this.text.trim();
