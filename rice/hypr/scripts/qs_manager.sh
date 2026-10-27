@@ -19,11 +19,9 @@ if [[ "$ACTION" =~ ^[0-9]+$ ]]; then
     # Send IPC command directly to Main.qml via Quickshell's native IPC handler
     quickshell -p "$SHELL_QML_PATH" ipc call main handleCommand "close" "" "" >/dev/null 2>&1
 
-    if [[ "$TARGET" == "move" ]]; then
-        niri msg action move-window-to-workspace "$ACTION" >/dev/null 2>&1
-    else
-        niri msg action focus-workspace "$ACTION" >/dev/null 2>&1
-    fi
+    CMD="workspace $ACTION"
+    [[ "$TARGET" == "move" ]] && CMD="movetoworkspace $ACTION"
+    hyprctl --batch "dispatch $CMD" >/dev/null 2>&1
     exit 0
 fi
 
@@ -183,8 +181,8 @@ if [[ "$ACTION" == "open" || "$ACTION" == "toggle" ]]; then
         CURRENT_SRC=""
         if pgrep -a "mpvpaper" > /dev/null; then
             CURRENT_SRC=$(pgrep -a mpvpaper | grep -o "$SRC_DIR/[^' ]*" | head -n1)
-        elif [ -f "$HOME/.config/hypr/wallpaper" ]; then
-            CURRENT_SRC=$(cat "$HOME/.config/hypr/wallpaper" 2>/dev/null)
+        elif command -v awww >/dev/null; then
+            CURRENT_SRC=$(awww query 2>/dev/null | grep -o "$SRC_DIR/[^ ]*" | head -n1)
         fi
 
         TARGET_THUMB=""

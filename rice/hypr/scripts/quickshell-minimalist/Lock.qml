@@ -184,7 +184,7 @@ ShellRoot {
                 
                 Process {
                     id: kbPoller
-                    command: ["bash", "-c", "niri msg -j keyboard-layouts 2>/dev/null | jq -r '(.keyboard_layouts // []) | map(select(.is_current)) | .[0].short_name // empty' | head -n1 | cut -c1-2 | tr '[:lower:]' '[:upper:]'"]
+                    command: ["bash", "-c", "hyprctl devices -j | jq -r '.keyboards[] | select(.main == true) | .active_keymap' | head -n1 | cut -c1-2 | tr '[:lower:]' '[:upper:]'"]
                     stdout: StdioCollector {
                         onStreamFinished: {
                             let layout = this.text.trim();

@@ -36,12 +36,9 @@ Variants {
             required property var modelData
             screen: modelData
 
-            anchors {
-                top: true
-                left: true
-                right: true
-            }
-
+            anchors.top: true
+                anchors.left: true
+                anchors.right: true
             Scaler {
                 id: scaler
                 currentWidth: barWindow.width
@@ -1281,7 +1278,7 @@ Variants {
                                     Text { anchors.verticalCenter: parent.verticalCenter; text: "󰌌"; font.family: "Iosevka Nerd Font"; font.pixelSize: barWindow.s(16); color: parent.parent.isHovered ? mocha.text : mocha.overlay2 }
                                     Text { anchors.verticalCenter: parent.verticalCenter; text: barWindow.kbLayout; font.family: "JetBrains Mono"; font.pixelSize: barWindow.s(13); font.weight: Font.Black; color: mocha.text }
                                 }
-                                MouseArea { id: kbMouse; anchors.fill: parent; hoverEnabled: true; onClicked: Quickshell.execDetached(["niri", "msg", "action", "switch-layout", "next"]) }
+                                MouseArea { id: kbMouse; anchors.fill: parent; hoverEnabled: true; onClicked: Quickshell.execDetached(["hyprctl", "switchxkblayout", "main", "next"]) }
                             }
 
                             Rectangle {

@@ -90,7 +90,7 @@ Item {
     // ── MONITOR PROCESS ───────────────────────────────────────────────────────
     Process {
         id: monitorProc
-        command: ["niri", "msg", "-j", "outputs"]
+        command: ["sh", "-c", "export PATH=$PATH:/usr/bin:/usr/local/bin:/run/current-system/sw/bin && hyprctl monitors -j"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
@@ -514,8 +514,11 @@ Item {
                     export TARGET_MONITORS="${escOutputs}"
                     cp "$DEST_FILE" ${paths.getCacheDir("wallpaper_picker")}/current_wallpaper.png || true
                     pkill mpvpaper || true
-                    pkill swaybg 2>/dev/null
-                        swaybg -i "$DEST_FILE" -m fill &
+                    if [ "$TARGET_MONITORS" = "all" ]; then
+                        awww img "$DEST_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >> ${logFile} 2>&1 &
+                    else
+                        awww img -o "$TARGET_MONITORS" "$DEST_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >> ${logFile} 2>&1 &
+                    fi
                     echo "$DEST_FILE" > "$HOME/.config/hypr/wallpaper"
                     ( matugen image --source-color-index 0 "$FINAL_THUMB" || true; bash "$RELOAD_SCRIPT" || true ) &
                 `;
@@ -538,8 +541,11 @@ Item {
                         magick "$DEST_FILE" -resize x420 -quality 70 "$FINAL_THUMB" || true
                         cp "$DEST_FILE" ${paths.getCacheDir("wallpaper_picker")}/current_wallpaper.png || true
                         pkill mpvpaper || true
-                        pkill swaybg 2>/dev/null
-                        swaybg -i "$DEST_FILE" -m fill &
+                        if [ "$TARGET_MONITORS" = "all" ]; then
+                            awww img "$DEST_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >> ${logFile} 2>&1 &
+                        else
+                            awww img -o "$TARGET_MONITORS" "$DEST_FILE" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >> ${logFile} 2>&1 &
+                        fi
                         echo "$DEST_FILE" > "$HOME/.config/hypr/wallpaper"
                         ( matugen image --source-color-index 0 "$FINAL_THUMB" || true; bash "$RELOAD_SCRIPT" || true ) &
                     fi
@@ -568,8 +574,11 @@ Item {
             `;
         } else {
             wallpaperCmd = `
-                pkill swaybg 2>/dev/null
-                    swaybg -i "${escOriginal}" -m fill &
+                if [ "${escOutputs}" = "all" ]; then
+                    awww img "${escOriginal}" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >> ${logFile} 2>&1 &
+                else
+                    awww img -o "${escOutputs}" "${escOriginal}" --transition-type ${randomTransition} --transition-pos 0.5,0.5 --transition-fps 144 --transition-duration 1 >> ${logFile} 2>&1 &
+                fi
                 echo "${escOriginal}" > "$HOME/.config/hypr/wallpaper"
             `;
         }

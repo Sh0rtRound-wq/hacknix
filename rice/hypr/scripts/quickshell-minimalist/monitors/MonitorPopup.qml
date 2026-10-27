@@ -1,6 +1,5 @@
 import QtQuick
-import QtQuick.Layouts
-import QtQuick.Effects
+import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import "../"
@@ -11,81 +10,47 @@ Item {
 
     Caching { id: paths }
 
-    // --- Responsive Scaling Logic ---
-    Scaler {
-        id: scaler
-        currentWidth: Screen.width
-    }
-    
-    // Helper function scoped to the root Item
-    function s(val) { 
-        return scaler.s(val); 
-    }
+    // ── PASSTHROUGH PROPS (Main.qml compat) ───────────────────────────────────
+    property var  notifModel
+    property var  liveNotifs
+    property real layoutWidth:  0
+    property real layoutHeight: 0
 
-    // Custom File Logger
     function debugLog(msg) {
         let safeMsg = msg.replace(/'/g, "'\\''");
-        Quickshell.execDetached(["sh", "-c", "echo '" + safeMsg + "' >> " + paths.logDir + "/monitor_popup.log"]);
+        Quickshell.execDetached(["sh", "-c", "echo '" + safeMsg + "' >> /tmp/monitor_popup.log"]);
     }
-    
-    // -------------------------------------------------------------------------
-    // COLORS (Dynamic Matugen Palette)
-    // -------------------------------------------------------------------------
-    MatugenColors { id: _theme }
-    readonly property color base: _theme.base
-    readonly property color mantle: _theme.mantle
-    readonly property color crust: _theme.crust
-    readonly property color text: _theme.text
-    readonly property color subtext0: _theme.subtext0
-    readonly property color overlay0: _theme.overlay0
-    readonly property color surface0: _theme.surface0
-    readonly property color surface1: _theme.surface1
-    readonly property color surface2: _theme.surface2
-    
-    readonly property color mauve: _theme.mauve
-    readonly property color blue: _theme.blue
-    readonly property color pink: _theme.pink
-    readonly property color teal: _theme.teal
-    readonly property color yellow: _theme.yellow
-    readonly property color peach: _theme.peach
-    readonly property color green: _theme.green
-    readonly property color red: _theme.red
-    readonly property color sapphire: _theme.sapphire
 
-    // -------------------------------------------------------------------------
-    // STATE & MATH
-    // -------------------------------------------------------------------------
-    property int activeEditIndex: 0
-    property int activeFocusIndex: 0 // 0: Res, 1: Clock, 2: Frame, 3: Apply
-    property real uiScale: 0.10 
-    
-    // Wayland Absolute Anchor tracking
+    // ── STATE ─────────────────────────────────────────────────────────────────
+    property int activeEditIndex:  0
+    property int activeFocusIndex: 0   // 0: Res  1: Transform  2: Rate  3: Apply
+    property real uiScale:         0.10
+
     property int originalLayoutOriginX: 0
     property int originalLayoutOriginY: 0
 
-    ListModel {
-        id: monitorsModel
-    }
-    
+    property bool applyHovered: false
+    property bool applyPressed: false
+
+    ListModel { id: monitorsModel }
+
+    // header(22) + monList(56) + sep(1) + editArea(~145) + sep(1) + apply(36) + footer(26) + pad(13)
+    property real targetMasterHeight: 400
+
     property var resList: [
-        {w: 3840, h: 2160, l: "4K",   accent: window.pink},
-        {w: 2560, h: 1600, l: "WQXGA",accent: window.mauve},
-        {w: 2560, h: 1440, l: "QHD",  accent: window.mauve},
-        {w: 1920, h: 1200, l: "WUXGA",accent: window.blue},
-        {w: 1920, h: 1080, l: "FHD",  accent: window.blue},
-        {w: 1680, h: 1050, l: "WSXGA+",accent: window.sapphire},
-        {w: 1600, h: 900,  l: "HD+",  accent: window.teal},
-        {w: 1440, h: 900,  l: "WXGA+",accent: window.teal},
-        {w: 1366, h: 768,  l: "WXGA", accent: window.yellow},
-        {w: 1280, h: 800,  l: "WSVGA",accent: window.peach},
-        {w: 1280, h: 720,  l: "HD",   accent: window.peach},
-        {w: 1024, h: 768,  l: "XGA",  accent: window.green}
+        {w: 3840, h: 2160, l: "4K"  },
+        {w: 2560, h: 1440, l: "QHD" },
+        {w: 1920, h: 1080, l: "FHD" },
+        {w: 1600, h: 900,  l: "HD+" },
+        {w: 1366, h: 768,  l: "WXGA"},
+        {w: 1280, h: 720,  l: "HD"  },
+        {w: 1024, h: 768,  l: "XGA" },
+        {w: 800,  h: 600,  l: "SVGA"}
     ]
 
-    property color selectedResAccent: window.mauve
-    property color selectedRateAccent: window.blue
+    property var ratesList: [60, 75, 100, 120, 144, 165, 180, 240, 360]
 
-    property int currentTransform: monitorsModel.count > 0 ? monitorsModel.get(window.activeEditIndex).transform : 0
+    property int currentTransform:  monitorsModel.count > 0 ? monitorsModel.get(window.activeEditIndex).displayTransform : 0
     property bool currentIsPortrait: currentTransform === 1 || currentTransform === 3
 
     property real currentSimW: {
@@ -99,126 +64,88 @@ Item {
         return currentIsPortrait ? mon.resW : mon.resH;
     }
 
-    property real globalOrbitAngle: 0
-    NumberAnimation on globalOrbitAngle {
-        from: 0
-        to: Math.PI * 2
-        duration: 90000
-        loops: Animation.Infinite
-        running: true
+    function currentRateIndex() {
+        if (monitorsModel.count === 0) return 0;
+        let r = parseInt(monitorsModel.get(window.activeEditIndex).rate);
+        let best = 0; let minDiff = 99999;
+        for (let i = 0; i < ratesList.length; i++) {
+            let d = Math.abs(ratesList[i] - r);
+            if (d < minDiff) { minDiff = d; best = i; }
+        }
+        return best;
     }
-    
-    // -------------------------------------------------------------------------
-    // KEYBOARD NAVIGATION LOGIC
-    // -------------------------------------------------------------------------
+
+    function updateRateSelection(idx) {
+        if (monitorsModel.count === 0) return;
+        monitorsModel.setProperty(window.activeEditIndex, "rate", ratesList[idx].toString());
+    }
+
+    // ── KEYBOARD ──────────────────────────────────────────────────────────────
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Tab) {
             if (event.modifiers & Qt.ControlModifier) {
-                if (monitorsModel.count > 1) {
-                    window.activeEditIndex = (window.activeEditIndex + 1) % monitorsModel.count;
-                }
+                if (monitorsModel.count > 1) window.activeEditIndex = (window.activeEditIndex + 1) % monitorsModel.count;
             } else {
                 window.activeFocusIndex = (window.activeFocusIndex + 1) % 4;
             }
             event.accepted = true;
         } else if (event.key === Qt.Key_Backtab) {
             if (event.modifiers & Qt.ControlModifier) {
-                if (monitorsModel.count > 1) {
-                    window.activeEditIndex = (window.activeEditIndex - 1 + monitorsModel.count) % monitorsModel.count;
-                }
+                if (monitorsModel.count > 1) window.activeEditIndex = (window.activeEditIndex - 1 + monitorsModel.count) % monitorsModel.count;
             } else {
                 window.activeFocusIndex = (window.activeFocusIndex - 1 + 4) % 4;
             }
             event.accepted = true;
-        } else if (event.key === Qt.Key_Left) {
-            handleArrowKey("Left"); event.accepted = true;
-        } else if (event.key === Qt.Key_Right) {
-            handleArrowKey("Right"); event.accepted = true;
-        } else if (event.key === Qt.Key_Up) {
-            handleArrowKey("Up"); event.accepted = true;
-        } else if (event.key === Qt.Key_Down) {
-            handleArrowKey("Down"); event.accepted = true;
+        } else if (event.key === Qt.Key_Left)  { handleArrowKey("Left");  event.accepted = true;
+        } else if (event.key === Qt.Key_Right) { handleArrowKey("Right"); event.accepted = true;
+        } else if (event.key === Qt.Key_Up)    { handleArrowKey("Up");    event.accepted = true;
+        } else if (event.key === Qt.Key_Down)  { handleArrowKey("Down");  event.accepted = true;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (activeFocusIndex === 3) {
-                window.applyPressed = true;
-                window.triggerApply();
-            }
+            if (activeFocusIndex === 3) { window.applyPressed = true; window.triggerApply(); }
+            event.accepted = true;
+        } else if (event.key === Qt.Key_Escape) {
+            Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "close"]);
             event.accepted = true;
         }
     }
-    
+
     Keys.onReleased: (event) => {
-        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            window.applyPressed = false;
-        }
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) window.applyPressed = false;
     }
 
     function handleArrowKey(dir) {
         if (monitorsModel.count === 0) return;
-        
         if (activeFocusIndex === 0) {
             let activeMon = monitorsModel.get(window.activeEditIndex);
-            let idx = 2; // Default FHD
+            let idx = 2;
             for (let i = 0; i < window.resList.length; i++) {
-                if (window.resList[i].w === activeMon.resW && window.resList[i].h === activeMon.resH) {
-                    idx = i; break;
-                }
+                if (window.resList[i].w === activeMon.resW && window.resList[i].h === activeMon.resH) { idx = i; break; }
             }
-            
             if (dir === "Left" && idx % 2 !== 0) idx--;
-            else if (dir === "Right" && idx % 2 === 0 && idx + 1 < window.resList.length) idx++;
+            else if (dir === "Right" && idx % 2 === 0 && idx < 7) idx++;
             else if (dir === "Up" && idx >= 2) idx -= 2;
-            else if (dir === "Down" && idx + 2 < window.resList.length) idx += 2;
-
-            window.selectedResAccent = window.resList[idx].accent;
+            else if (dir === "Down" && idx <= 5) idx += 2;
             monitorsModel.setProperty(window.activeEditIndex, "resW", window.resList[idx].w);
             monitorsModel.setProperty(window.activeEditIndex, "resH", window.resList[idx].h);
             delayedLayoutUpdate.restart();
-            
         } else if (activeFocusIndex === 1) {
-            let t = monitorsModel.get(window.activeEditIndex).transform;
+            let t = monitorsModel.get(window.activeEditIndex).displayTransform;
             if (dir === "Up") t = 0;
             else if (dir === "Right") t = 1;
             else if (dir === "Down") t = 2;
             else if (dir === "Left") t = 3;
-            monitorsModel.setProperty(window.activeEditIndex, "transform", t);
+            monitorsModel.setProperty(window.activeEditIndex, "displayTransform", t);
             delayedLayoutUpdate.restart();
-            
         } else if (activeFocusIndex === 2) {
-            let cIdx = sliderContainer.currentIndex;
-            if (dir === "Left" && cIdx > 0) cIdx--;
-            else if (dir === "Right" && cIdx < sliderContainer.rates.length - 1) cIdx++;
-            sliderContainer.updateSelectionVisual(cIdx);
+            let cIdx = currentRateIndex();
+            if (dir === "Left" && cIdx > 0) updateRateSelection(cIdx - 1);
+            else if (dir === "Right" && cIdx < ratesList.length - 1) updateRateSelection(cIdx + 1);
         }
     }
 
-    // -------------------------------------------------------------------------
-    // FLUID STARTUP ANIMATIONS 
-    // -------------------------------------------------------------------------
-    property real introProgress: 0.0
-    property real monitorScale: 0.85
-    property real uiYOffset: window.s(25)
-    property real screenLight: 0.0
+    onActiveEditIndexChanged: { /* no menu transition needed in TUI */ }
 
-    Component.onCompleted: startupAnim.start()
-
-    ParallelAnimation {
-        id: startupAnim
-        NumberAnimation { target: window; property: "introProgress"; from: 0.0; to: 1.0; duration: 900; easing.type: Easing.OutQuint }
-        NumberAnimation { target: window; property: "monitorScale"; from: 0.85; to: 1.0; duration: 1200; easing.type: Easing.OutQuint }
-        NumberAnimation { target: window; property: "uiYOffset"; from: window.s(25); to: 0; duration: 1800; easing.type: Easing.OutQuint }
-        NumberAnimation { target: window; property: "screenLight"; from: 0.0; to: 1.0; duration: 1500; easing.type: Easing.InOutQuad }
-    }
-    property bool applyHovered: false
-    property bool applyPressed: false
-
-    onActiveEditIndexChanged: {
-        menuTransitionAnim.restart();
-    }
-
-    // -------------------------------------------------------------------------
-    // MATHEMATICAL PERIMETER GLUE (Virtual Coordinates - Do not scale)
-    // -------------------------------------------------------------------------
+    // ── LAYOUT MATH ──────────────────────────────────────────────────────────
     function isOverlapping(ax, ay, aw, ah, bx, by, bw, bh) {
         return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
     }
@@ -227,7 +154,7 @@ Item {
         for (let i = 0; i < monitorsModel.count; i++) {
             if (i === skipIdx) continue;
             let m = monitorsModel.get(i);
-            let isP = m.transform === 1 || m.transform === 3;
+            let isP = m.displayTransform === 1 || m.displayTransform === 3;
             let mW = ((isP ? m.resH : m.resW) / m.sysScale) * window.uiScale;
             let mH = ((isP ? m.resW : m.resH) / m.sysScale) * window.uiScale;
             if (isOverlapping(x, y, w, h, m.uiX, m.uiY, mW, mH)) return true;
@@ -237,146 +164,85 @@ Item {
 
     function getPerimeterSnap(pX, pY, sX, sY, sW, sH, mW, mH, snapT) {
         let edges = [
-            { x1: sX - mW, x2: sX + sW, y1: sY - mH, y2: sY - mH }, // Top Edge
-            { x1: sX - mW, x2: sX + sW, y1: sY + sH, y2: sY + sH }, // Bottom Edge
-            { x1: sX - mW, x2: sX - mW, y1: sY - mH, y2: sY + sH }, // Left Edge
-            { x1: sX + sW, x2: sX + sW, y1: sY - mH, y2: sY + sH }  // Right Edge
+            { x1: sX - mW, x2: sX + sW, y1: sY - mH, y2: sY - mH },
+            { x1: sX - mW, x2: sX + sW, y1: sY + sH, y2: sY + sH },
+            { x1: sX - mW, x2: sX - mW, y1: sY - mH, y2: sY + sH },
+            { x1: sX + sW, x2: sX + sW, y1: sY - mH, y2: sY + sH }
         ];
-
-        let bestX = pX;
-        let bestY = pY;
-        let minDist = 999999;
-
+        let bestX = pX; let bestY = pY; let minDist = 999999;
         for (let i = 0; i < 4; i++) {
             let e = edges[i];
-            
             let cx = Math.max(e.x1, Math.min(pX, e.x2));
             let cy = Math.max(e.y1, Math.min(pY, e.y2));
-
             if (Math.abs(cx - sX) < snapT) cx = sX;
             if (Math.abs(cx - (sX + sW - mW)) < snapT) cx = sX + sW - mW;
             if (Math.abs(cx - (sX + sW/2 - mW/2)) < snapT) cx = sX + sW/2 - mW/2;
-            
             if (Math.abs(cy - sY) < snapT) cy = sY;
             if (Math.abs(cy - (sY + sH - mH)) < snapT) cy = sY + sH - mH;
             if (Math.abs(cy - (sY + sH/2 - mH/2)) < snapT) cy = sY + sH/2 - mH/2;
-
             let dist = Math.hypot(pX - cx, pY - cy);
-            if (dist < minDist) {
-                minDist = dist;
-                bestX = cx;
-                bestY = cy;
-            }
+            if (dist < minDist) { minDist = dist; bestX = cx; bestY = cy; }
         }
         return { x: bestX, y: bestY };
     }
 
     function forceLayoutUpdate() {
         if (monitorsModel.count < 2) return;
-        
         let mIdx = window.activeEditIndex;
         let mModel = monitorsModel.get(mIdx);
-        let isP = mModel.transform === 1 || mModel.transform === 3;
+        let isP = mModel.displayTransform === 1 || mModel.displayTransform === 3;
         let mW = ((isP ? mModel.resH : mModel.resW) / mModel.sysScale) * window.uiScale;
         let mH = ((isP ? mModel.resW : mModel.resH) / mModel.sysScale) * window.uiScale;
-
-        let bestX = mModel.uiX;
-        let bestY = mModel.uiY;
-        let bestDist = 999999;
-
+        let bestX = mModel.uiX; let bestY = mModel.uiY; let bestDist = 999999;
         for (let i = 0; i < monitorsModel.count; i++) {
             if (i === mIdx) continue;
             let sModel = monitorsModel.get(i);
-            let sIsP = sModel.transform === 1 || sModel.transform === 3;
+            let sIsP = sModel.displayTransform === 1 || sModel.displayTransform === 3;
             let sW = ((sIsP ? sModel.resH : sModel.resW) / sModel.sysScale) * window.uiScale;
             let sH = ((sIsP ? sModel.resW : sModel.resH) / sModel.sysScale) * window.uiScale;
-            
-            let snapped = window.getPerimeterSnap(
-                mModel.uiX, mModel.uiY,
-                sModel.uiX, sModel.uiY,
-                sW, sH, mW, mH, window.s(20)
-            );
-            
+            let snapped = window.getPerimeterSnap(mModel.uiX, mModel.uiY, sModel.uiX, sModel.uiY, sW, sH, mW, mH, 20);
             let dist = Math.hypot(snapped.x - mModel.uiX, snapped.y - mModel.uiY);
-            if (dist < bestDist) {
-                bestDist = dist;
-                bestX = snapped.x;
-                bestY = snapped.y;
-            }
+            if (dist < bestDist) { bestDist = dist; bestX = snapped.x; bestY = snapped.y; }
         }
-
         monitorsModel.setProperty(mIdx, "uiX", bestX);
         monitorsModel.setProperty(mIdx, "uiY", bestY);
     }
 
-    Timer {
-        id: delayedLayoutUpdate
-        interval: 10
-        running: false
-        repeat: false
-        onTriggered: window.forceLayoutUpdate()
-    }
+    Timer { id: delayedLayoutUpdate; interval: 10; running: false; repeat: false; onTriggered: window.forceLayoutUpdate() }
 
-    // -------------------------------------------------------------------------
-    // NATIVE SYSTEM PROCESSES 
-    // -------------------------------------------------------------------------
+    // ── PROCESSES ─────────────────────────────────────────────────────────────
     Process {
         id: displayPoller
-        command: ["niri", "msg", "-j", "outputs"]
+        command: ["hyprctl", "monitors", "-j"]
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
-                    // niri msg -j outputs returns an object keyed by name, not an array
-                    let data = Object.values(JSON.parse(this.text.trim()));
+                    let data = JSON.parse(this.text.trim());
                     monitorsModel.clear();
-
-                    let minX = 999999, minY = 999999;
-                    function niriTransformToInt(t) {
-                        switch(t) {
-                            case "90": return 1; case "180": return 2; case "270": return 3;
-                            case "Flipped": return 4; case "Flipped90": return 5;
-                            case "Flipped180": return 6; case "Flipped270": return 7;
-                            default: return 0; // "Normal"
-                        }
-                    }
-
+                    let minX = 999999; let minY = 999999;
                     for (let i = 0; i < data.length; i++) {
-                        let lx = data[i].logical ? data[i].logical.x : 0;
-                        let ly = data[i].logical ? data[i].logical.y : 0;
-                        if (lx < minX) minX = lx;
-                        if (ly < minY) minY = ly;
+                        if (data[i].x < minX) minX = data[i].x;
+                        if (data[i].y < minY) minY = data[i].y;
                     }
-
                     window.originalLayoutOriginX = minX !== 999999 ? minX : 0;
                     window.originalLayoutOriginY = minY !== 999999 ? minY : 0;
-
                     for (let i = 0; i < data.length; i++) {
-                        let logi = data[i].logical || {};
-                        // current_mode is an index into modes[], not a mode object
-                        let modeIdx = data[i].current_mode;
-                        let mode = (modeIdx !== null && modeIdx !== undefined && data[i].modes)
-                            ? data[i].modes[modeIdx] : {};
-                        let scl = logi.scale !== undefined ? logi.scale : 1.0;
-                        let tf  = niriTransformToInt(logi.transform);
-                        let lx  = logi.x !== undefined ? logi.x : 0;
-                        let ly  = logi.y !== undefined ? logi.y : 0;
-                        let normalizedX = (lx - minX) * window.uiScale;
-                        let normalizedY = (ly - minY) * window.uiScale;
-
+                        let scl = data[i].scale !== undefined ? data[i].scale : 1.0;
+                        let tf  = data[i].transform !== undefined ? data[i].transform : 0;
                         monitorsModel.append({
                             name: data[i].name,
-                            resW: mode.width || 0,
-                            resH: mode.height || 0,
+                            resW: data[i].width,
+                            resH: data[i].height,
                             sysScale: scl,
-                            rate: Math.round((mode.refresh_rate || 60000) / 1000).toString(),
-                            uiX: normalizedX,
-                            uiY: normalizedY,
-                            transform: tf,
+                            rate: Math.round(data[i].refreshRate).toString(),
+                            uiX: (data[i].x - minX) * window.uiScale,
+                            uiY: (data[i].y - minY) * window.uiScale,
+                            displayTransform: tf,
                             primary: false
                         });
+                        if (data[i].focused) window.activeEditIndex = i;
                     }
-
                     window.forceLayoutUpdate();
                     primaryPoller.running = true;
                 } catch(e) {}
@@ -392,59 +258,41 @@ Item {
             onStreamFinished: {
                 let name = this.text.trim();
                 if (!name) return;
-                for (let i = 0; i < monitorsModel.count; i++) {
+                for (let i = 0; i < monitorsModel.count; i++)
                     monitorsModel.setProperty(i, "primary", monitorsModel.get(i).name === name);
-                }
             }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // SYSTEM APPLY FUNCTION & DEBUG LOGGING
-    // -------------------------------------------------------------------------
+    // ── APPLY ─────────────────────────────────────────────────────────────────
+    // flashRect stub (referenced by triggerApply)
+    Rectangle { id: flashRect; anchors.fill: parent; color: "white"; opacity: 0; z: 999; visible: opacity > 0 }
+    NumberAnimation { id: applyFlashAnim; target: flashRect; property: "opacity"; to: 0; duration: 600; easing.type: Easing.OutQuart }
+
     function triggerApply() {
-        flashRect.opacity = 0.8; 
+        flashRect.opacity = 0.8;
         applyFlashAnim.start();
-
         if (monitorsModel.count === 0) return;
-
         window.debugLog("================= NEW APPLY RUN =================");
-
         if (monitorsModel.count === 1) {
             let m = monitorsModel.get(0);
-
-            let jsonMonitorsArray = [{
-                name: m.name, resW: m.resW, resH: m.resH, rate: parseInt(m.rate),
-                x: 0, y: 0, scale: m.sysScale, transform: m.transform, primary: m.primary
-            }];
+            let jsonMonitorsArray = [{ name: m.name, resW: m.resW, resH: m.resH, rate: parseInt(m.rate), x: 0, y: 0, scale: m.sysScale, transform: m.displayTransform, primary: m.primary }];
             let safeJson = JSON.stringify(jsonMonitorsArray).replace(/'/g, "'\\''");
             let jsonCmd = "jq '.monitors = " + safeJson + "' ~/.config/hypr/settings.json > ~/.config/hypr/settings.json.tmp && mv ~/.config/hypr/settings.json.tmp ~/.config/hypr/settings.json";
-
             Quickshell.execDetached(["notify-send", "Display Update", "Applied & Saved: " + m.resW + "x" + m.resH + " @ " + m.rate + "Hz"]);
             Quickshell.execDetached(["sh", "-c", jsonCmd + " && bash ~/.config/hypr/scripts/settings_watcher.sh --compile"]);
-
-            window.debugLog("Executed single monitor apply.");
         } else {
             let rects = [];
-            let finalMinX = 999999;
-            let finalMinY = 999999;
-
+            let finalMinX = 999999; let finalMinY = 999999;
             for (let i = 0; i < monitorsModel.count; i++) {
                 let m = monitorsModel.get(i);
-                let isP = m.transform === 1 || m.transform === 3;
+                let isP = m.displayTransform === 1 || m.displayTransform === 3;
                 let physW = Math.round((isP ? m.resH : m.resW) / m.sysScale);
                 let physH = Math.round((isP ? m.resW : m.resH) / m.sysScale);
-                
                 let rawX = m.uiX / window.uiScale;
                 let rawY = m.uiY / window.uiScale;
-                
-                rects.push({
-                    x: rawX, y: rawY, w: physW, h: physH,
-                    resW: m.resW, resH: m.resH, name: m.name,
-                    rate: m.rate, sysScale: m.sysScale, transform: m.transform, primary: m.primary
-                });
+                rects.push({ x: rawX, y: rawY, w: physW, h: physH, resW: m.resW, resH: m.resH, name: m.name, rate: m.rate, sysScale: m.sysScale, transform: m.displayTransform, primary: m.primary });
             }
-
             function getTightSnap(pX, pY, sX, sY, sW, sH, mW, mH, t) {
                 let cx = pX; let cy = pY;
                 if (Math.abs(cx - (sX - mW)) < t) cx = sX - mW;
@@ -452,1102 +300,390 @@ Item {
                 else if (Math.abs(cx - sX) < t) cx = sX;
                 else if (Math.abs(cx - (sX + sW - mW)) < t) cx = sX + sW - mW;
                 else if (Math.abs(cx - (sX + sW/2 - mW/2)) < t) cx = sX + sW/2 - mW/2;
-                
                 if (Math.abs(cy - (sY - mH)) < t) cy = sY - mH;
                 else if (Math.abs(cy - (sY + sH)) < t) cy = sY + sH;
                 else if (Math.abs(cy - sY) < t) cy = sY;
                 else if (Math.abs(cy - (sY + sH - mH)) < t) cy = sY + sH - mH;
                 else if (Math.abs(cy - (sY + sH/2 - mH/2)) < t) cy = sY + sH/2 - mH/2;
-                
-                return {x: cx, y: cy};
+                return { x: cx, y: cy };
             }
-
             for (let i = 1; i < rects.length; i++) {
-                let bestX = rects[i].x;
-                let bestY = rects[i].y;
-                let bestDist = 999999;
+                let bestX = rects[i].x; let bestY = rects[i].y; let bestDist = 999999;
                 for (let j = 0; j < i; j++) {
                     let r0 = rects[j];
-                    let snapped = getTightSnap(
-                        rects[i].x, rects[i].y,
-                        r0.x, r0.y,
-                        r0.w, r0.h, rects[i].w, rects[i].h, 25 // Intentionally unscaled (Physical display coordinates)
-                    );
+                    let snapped = getTightSnap(rects[i].x, rects[i].y, r0.x, r0.y, r0.w, r0.h, rects[i].w, rects[i].h, 25);
                     let dist = Math.hypot(rects[i].x - snapped.x, rects[i].y - snapped.y);
-                    if (dist < bestDist) {
-                        bestDist = dist;
-                        bestX = Math.round(snapped.x);
-                        bestY = Math.round(snapped.y);
-                    }
+                    if (dist < bestDist) { bestDist = dist; bestX = Math.round(snapped.x); bestY = Math.round(snapped.y); }
                 }
-                rects[i].x = bestX;
-                rects[i].y = bestY;
+                rects[i].x = bestX; rects[i].y = bestY;
             }
-
             for (let i = 0; i < rects.length; i++) {
                 if (rects[i].x < finalMinX) finalMinX = rects[i].x;
                 if (rects[i].y < finalMinY) finalMinY = rects[i].y;
             }
-            
-            let summaryString = "";
-            let jsonMonitorsArray = [];
-
+            let summaryString = ""; let jsonMonitorsArray = [];
             for (let i = 0; i < rects.length; i++) {
                 let r = rects[i];
-
-                r.x = Math.round(r.x - finalMinX);
-                r.y = Math.round(r.y - finalMinY);
-
+                r.x = Math.round(r.x - finalMinX); r.y = Math.round(r.y - finalMinY);
                 summaryString += r.name + " ";
-
-                jsonMonitorsArray.push({
-                    name: r.name, resW: r.resW, resH: r.resH, rate: parseInt(r.rate),
-                    x: r.x, y: r.y, scale: r.sysScale, transform: r.transform, primary: r.primary
-                });
+                jsonMonitorsArray.push({ name: r.name, resW: r.resW, resH: r.resH, rate: parseInt(r.rate), x: r.x, y: r.y, scale: r.sysScale, transform: r.transform, primary: r.primary });
             }
-
             let safeJson = JSON.stringify(jsonMonitorsArray).replace(/'/g, "'\\''");
             let jsonCmd = "jq '.monitors = " + safeJson + "' ~/.config/hypr/settings.json > ~/.config/hypr/settings.json.tmp && mv ~/.config/hypr/settings.json.tmp ~/.config/hypr/settings.json";
-
             Quickshell.execDetached(["sh", "-c", jsonCmd + " && bash ~/.config/hypr/scripts/settings_watcher.sh --compile"]);
             Quickshell.execDetached(["notify-send", "Display Update", "Applied & Saved layout for: " + summaryString]);
-
-            window.debugLog("Executed multi monitor apply.");
         }
     }
 
-
-    // -------------------------------------------------------------------------
-    // UI LAYOUT
-    // -------------------------------------------------------------------------
-    Item {
+    // ── UI ────────────────────────────────────────────────────────────────────
+    TuiPanel {
+        id: panel
+        label: "MONITORS"
         anchors.fill: parent
-        scale: 0.95 + (0.05 * window.introProgress)
-        opacity: window.introProgress
+
+        // ── MONITOR CANVAS ────────────────────────────────────────────────────
+        Item {
+            id: monCanvas
+            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+            height: 160
+
+            Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.25) }
+
+            // Bounding box of all monitors (in uiScale units)
+            property real _minX: { var mn=999999; for(var i=0;i<monitorsModel.count;i++) mn=Math.min(mn,monitorsModel.get(i).uiX); return mn<999999?mn:0; }
+            property real _minY: { var mn=999999; for(var i=0;i<monitorsModel.count;i++) mn=Math.min(mn,monitorsModel.get(i).uiY); return mn<999999?mn:0; }
+            property real _maxX: {
+                var mx=0;
+                for(var i=0;i<monitorsModel.count;i++){
+                    var m=monitorsModel.get(i); var p=m.displayTransform===1||m.displayTransform===3;
+                    mx=Math.max(mx, m.uiX+(p?m.resH:m.resW)*window.uiScale);
+                }
+                return mx;
+            }
+            property real _maxY: {
+                var mx=0;
+                for(var i=0;i<monitorsModel.count;i++){
+                    var m=monitorsModel.get(i); var p=m.displayTransform===1||m.displayTransform===3;
+                    mx=Math.max(mx, m.uiY+(p?m.resW:m.resH)*window.uiScale);
+                }
+                return mx;
+            }
+            // Fit-scale so monitors fill canvas with 14px padding
+            readonly property real fitScale: Math.min((width-28)/Math.max(_maxX-_minX,1), (height-28)/Math.max(_maxY-_minY,1))
+            // Center offset
+            readonly property real offX: (width  - (_maxX-_minX)*fitScale) / 2 - _minX*fitScale
+            readonly property real offY: (height - (_maxY-_minY)*fitScale) / 2 - _minY*fitScale
+
+            Repeater {
+                model: monitorsModel
+                Item {
+                    required property string name
+                    required property int    resW
+                    required property int    resH
+                    required property real   uiX
+                    required property real   uiY
+                    required property int    displayTransform
+                    required property bool   primary
+                    required property int    index
+
+                    property bool isPortrait: displayTransform === 1 || displayTransform === 3
+                    property real monW: (isPortrait ? resH : resW) * window.uiScale * monCanvas.fitScale
+                    property real monH: (isPortrait ? resW : resH) * window.uiScale * monCanvas.fitScale
+                    property bool isActive: index === window.activeEditIndex
+
+                    x: uiX * monCanvas.fitScale + monCanvas.offX
+                    y: uiY * monCanvas.fitScale + monCanvas.offY
+                    width: monW; height: monH
+
+                    Rectangle {
+                        anchors.fill: parent
+                        color: isActive
+                            ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.18)
+                            : Qt.rgba(0, 0, 0, 0.45)
+                        border.color: isActive ? panel.accent : panel.overlay0
+                        border.width: isActive ? 2 : 1
+                    }
+
+                    // [N] name — top left
+                    Text {
+                        anchors.top: parent.top; anchors.left: parent.left
+                        anchors.topMargin: 3; anchors.leftMargin: 4
+                        text: "[" + (index+1) + "] " + name
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: Math.max(7, Math.min(9, parent.width/14))
+                        color: isActive ? panel.accent : panel.dim
+                        elide: Text.ElideRight; width: parent.width - 8
+                    }
+
+                    // Resolution — center
+                    Text {
+                        anchors.centerIn: parent
+                        text: resW + "×" + resH
+                        font.family: "JetBrains Mono"
+                        font.pixelSize: Math.max(7, Math.min(10, parent.width/12))
+                        color: panel.fg; opacity: 0.75
+                        visible: parent.width > 50
+                    }
+
+                    // Orientation — bottom right
+                    Text {
+                        anchors.bottom: parent.bottom; anchors.right: parent.right
+                        anchors.bottomMargin: 2; anchors.rightMargin: 4
+                        text: displayTransform === 0 ? "─" : displayTransform === 1 ? "↻90°" : displayTransform === 2 ? "180°" : "↺90°"
+                        font.family: "JetBrains Mono"; font.pixelSize: 7
+                        color: isActive ? panel.accent : panel.dim
+                    }
+
+                    // PRIMARY star — top right
+                    Text {
+                        anchors.top: parent.top; anchors.right: parent.right
+                        anchors.topMargin: 2; anchors.rightMargin: 4
+                        text: "★"; font.family: "JetBrains Mono"; font.pixelSize: 8
+                        color: isActive ? panel.hdrFg : panel.accent
+                        visible: primary
+                    }
+
+                    MouseArea {
+                        id: monDragMa; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: (pressed && monitorsModel.count > 1) ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                        property real _cx: 0; property real _cy: 0
+                        property real _ux: 0; property real _uy: 0
+                        onPressed: {
+                            window.activeEditIndex = index;
+                            var pt = mapToItem(monCanvas, mouseX, mouseY);
+                            _cx = pt.x; _cy = pt.y; _ux = uiX; _uy = uiY;
+                        }
+                        onPositionChanged: {
+                            if (pressed && monitorsModel.count > 1) {
+                                var pt = mapToItem(monCanvas, mouseX, mouseY);
+                                monitorsModel.setProperty(index, "uiX", _ux + (pt.x - _cx) / monCanvas.fitScale);
+                                monitorsModel.setProperty(index, "uiY", _uy + (pt.y - _cy) / monCanvas.fitScale);
+                            }
+                        }
+                        onReleased: { if (monitorsModel.count > 1) delayedLayoutUpdate.restart(); }
+                    }
+                }
+            }
+        }
 
         Rectangle {
-            anchors.fill: parent
-            radius: window.s(30)
-            color: window.base
-            border.color: window.surface0
-            border.width: 1
-            clip: true
+            id: monListSep
+            anchors.top: monCanvas.bottom; anchors.left: parent.left; anchors.right: parent.right
+            height: 1; color: panel.sep
+        }
 
-            Rectangle {
-                width: parent.width * 0.8
-                height: width
-                radius: width / 2
-                x: (parent.width / 2 - width / 2) + Math.cos(window.globalOrbitAngle * 2) * window.s(150)
-                y: (parent.height / 2 - height / 2) + Math.sin(window.globalOrbitAngle * 2) * window.s(100)
-                opacity: 0.04
-                color: window.selectedResAccent
-                Behavior on color { ColorAnimation { duration: 1000 } }
-            }
-            Rectangle {
-                width: parent.width * 0.9
-                height: width
-                radius: width / 2
-                x: (parent.width / 2 - width / 2) + Math.sin(window.globalOrbitAngle * 1.5) * window.s(-150)
-                y: (parent.height / 2 - height / 2) + Math.cos(window.globalOrbitAngle * 1.5) * window.s(-100)
-                opacity: 0.04
-                color: window.selectedRateAccent
-                Behavior on color { ColorAnimation { duration: 1000 } }
-            }
+        // ── EDIT AREA ─────────────────────────────────────────────────────────
+        Item {
+            id: editArea
+            anchors.top: monListSep.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: 62
 
-            // ==========================================
-            // LEFT SIDE VISUAL AREA
-            // ==========================================
+            // ── RESOLUTION GRID ───────────────────────────────────────────────
             Item {
-                id: leftVisualArea
-                width: window.s(380)
-                height: window.s(300)
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.leftMargin: window.s(20)
+                id: resSection
+                anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.horizontalCenter; anchors.topMargin: 8; anchors.leftMargin: 10; anchors.rightMargin: 4
 
-                // --------------------------------------------------
-                // MODE 1: SINGLE MONITOR
-                // --------------------------------------------------
-                Item {
-                    anchors.fill: parent
-                    visible: monitorsModel.count === 1
+                Text {
+                    id: resLabel
+                    anchors.top: parent.top; anchors.left: parent.left
+                    text: "─[ RESOLUTION" + (window.activeFocusIndex === 0 ? " ◂ACTIVE" : "") + " ]"
+                    font.family: "JetBrains Mono"; font.pixelSize: 8; color: window.activeFocusIndex === 0 ? panel.accent : panel.dim
+                }
 
-                    Item {
-                        id: singleMonitorZoom
-                        anchors.centerIn: parent
-                        width: window.s(380)
-                        height: window.s(280)
-                        
-                        property real baseScale: Math.min(1.0, Math.min(2200 / window.currentSimW, 1400 / Math.max(1, window.currentSimH)))
-                        scale: baseScale * window.monitorScale
-                        opacity: window.introProgress
-                        Behavior on baseScale { NumberAnimation { duration: 600; easing.type: Easing.OutQuint } }
+                Grid {
+                    id: resGrid
+                    anchors.top: resLabel.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.topMargin: 4
+                    columns: 2; spacing: 4
+                    height: 4 * 22 + 3 * 4
 
-                        Rectangle {
-                            id: deskSurface
-                            width: window.s(1000)
-                            height: window.s(14)
-                            radius: window.s(6)
-                            anchors.top: standBase.bottom
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            color: window.mantle
-                            border.color: window.surface0
-                            border.width: 1
+                    Repeater {
+                        model: window.resList
+                        Item {
+                            width: resGrid.width / 2 - 2; height: 22
+                            required property var modelData
+                            required property int index
 
-                            Rectangle { 
-                                width: window.s(24)
-                                height: window.s(350)
-                                radius: window.s(4)
-                                color: window.crust
-                                anchors.top: parent.bottom
-                                anchors.topMargin: window.s(-5)
-                                anchors.left: parent.left
-                                anchors.leftMargin: window.s(100)
-                                z: -1 
-                            }
-                            Rectangle { 
-                                width: window.s(24)
-                                height: window.s(350)
-                                radius: window.s(4)
-                                color: window.crust
-                                anchors.top: parent.bottom
-                                anchors.topMargin: window.s(-5)
-                                anchors.right: parent.right
-                                anchors.rightMargin: window.s(100)
-                                z: -1 
-                            }
-                        }
-
-                        Rectangle {
-                            id: standBase
-                            width: window.s(130)
-                            height: window.s(8)
-                            radius: window.s(4)
-                            anchors.bottom: parent.bottom
-                            anchors.bottomMargin: window.s(20)
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            color: window.surface1
-                        }
-                        
-                        Rectangle {
-                            id: standNeck
-                            width: window.s(34)
-                            height: window.s(70)
-                            anchors.bottom: standBase.top
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            color: window.surface0
-                            Rectangle { 
-                                width: window.s(10)
-                                height: window.s(30)
-                                radius: window.s(5)
-                                anchors.centerIn: parent
-                                color: window.base 
-                            }
-                        }
-
-                        Rectangle {
-                            id: screenBezel
-                            
-                            // Perfect aspect ratio AND scales up physically on the desk at higher resolutions
-                            width: window.s(320) * (window.currentSimW / 1920.0)
-                            height: window.s(320) * (window.currentSimH / 1920.0)
-
-                            anchors.bottom: standNeck.top
-                            anchors.bottomMargin: window.s(-10)
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            radius: window.s(12)
-                            color: window.crust
-                            border.color: window.surface2
-                            border.width: window.s(2)
-                            
-                            Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutQuint } }
-                            Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutQuint } }
+                            property bool isCurrent: monitorsModel.count > 0 &&
+                                                     monitorsModel.get(window.activeEditIndex).resW === modelData.w &&
+                                                     monitorsModel.get(window.activeEditIndex).resH === modelData.h
 
                             Rectangle {
                                 anchors.fill: parent
-                                anchors.margins: window.s(10)
-                                radius: window.s(6)
-                                color: window.surface0
-                                clip: true
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: "transparent"
-                                    opacity: window.screenLight
-                                    
-                                    gradient: Gradient {
-                                        orientation: Gradient.Vertical
-                                        GradientStop { 
-                                            position: 0.0
-                                            color: Qt.tint(window.surface0, Qt.alpha(window.selectedResAccent, 0.15))
-                                            Behavior on color { ColorAnimation { duration: 400 } } 
-                                        }
-                                        GradientStop { 
-                                            position: 1.0
-                                            color: Qt.tint(window.surface0, Qt.alpha(window.selectedRateAccent, 0.1))
-                                            Behavior on color { ColorAnimation { duration: 400 } } 
-                                        }
-                                    }
-                                    
-                                    Grid { 
-                                        anchors.centerIn: parent
-                                        rows: 10
-                                        columns: 15
-                                        spacing: window.s(20)
-                                        Repeater { 
-                                            model: 150
-                                            Rectangle { width: window.s(2); height: window.s(2); radius: window.s(1); color: Qt.alpha(window.text, 0.1) } 
-                                        } 
-                                    }
-                                }
-
-                                Item {
-                                    anchors.centerIn: parent
-                                    width: window.s(160)
-                                    height: window.s(100)
-                                    
-                                    // 1. Counteract the environmental zoom factor
-                                    property real counterScale: 1.0 / singleMonitorZoom.scale
-                                    
-                                    // 2. Compute a safe physical boundary based on current visual rotation
-                                    // If rotated (portrait), we compare the wrapper's height to the screen's width, etc.
-                                    property real maxPhysicalScale: window.currentIsPortrait 
-                                        ? Math.min((parent.width * 0.9) / height, (parent.height * 0.9) / width)
-                                        : Math.min((parent.width * 0.9) / width, (parent.height * 0.9) / height)
-                                    
-                                    scale: Math.min(counterScale, maxPhysicalScale)
-                                    
-                                    ColumnLayout {
-                                        anchors.centerIn: parent
-                                        spacing: window.s(4)
-
-                                        // Restored Rotation: Acts as a pointer to the monitor's physical bottom
-                                        rotation: window.currentTransform * 90
-                                        Behavior on rotation { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-
-                                        Text { 
-                                            Layout.alignment: Qt.AlignHCenter
-                                            font.family: "Iosevka Nerd Font"
-                                            font.pixelSize: window.s(38)
-                                            color: window.selectedResAccent
-                                            text: "󰍹"
-                                            Behavior on color { ColorAnimation { duration: 400 } } 
-                                        }
-                                        Text { 
-                                            Layout.alignment: Qt.AlignHCenter
-                                            font.family: "JetBrains Mono"
-                                            font.weight: Font.Bold
-                                            font.pixelSize: window.s(16)
-                                            color: window.text
-                                            text: monitorsModel.count > 0 ? monitorsModel.get(0).name : "Unknown" 
-                                        }
-                                        Text { 
-                                            Layout.alignment: Qt.AlignHCenter
-                                            font.family: "JetBrains Mono"
-                                            font.pixelSize: window.s(12)
-                                            color: window.subtext0
-                                            text: window.currentSimW + "x" + window.currentSimH + " @ " + (monitorsModel.count > 0 ? monitorsModel.get(0).rate : "60") + "Hz" 
-                                        }
-                                    }
-                                }
+                                color: isCurrent ? panel.accent
+                                     : (resMa.containsMouse ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.15) : "transparent")
+                                border.color: isCurrent ? panel.accent : panel.sep; border.width: 1
                             }
-                        }
-                    }
-                }
-
-                // --------------------------------------------------
-                // MODE 2: MULTI-MONITOR (3+ Supported)
-                // --------------------------------------------------
-                Item {
-                    anchors.fill: parent
-                    visible: monitorsModel.count > 1
-
-                    Item {
-                        id: multiMonitorView
-                        width: window.s(380)
-                        height: window.s(280)
-                        anchors.centerIn: parent
-                        clip: true 
-
-                        Grid {
-                            anchors.centerIn: parent
-                            rows: 25
-                            columns: 34
-                            spacing: window.s(18)
-                            Repeater { 
-                                model: 850
-                                Rectangle { width: window.s(2); height: window.s(2); radius: window.s(1); color: Qt.alpha(window.text, 0.1) } 
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.l + "  " + modelData.w + "×" + modelData.h
+                                font.family: "JetBrains Mono"; font.pixelSize: 8
+                                color: isCurrent ? panel.bg : panel.dim
                             }
-                        }
-
-                        property real targetScale: {
-                            if (monitorsModel.count < 2) return 1.0;
-                            let minX = 999999, minY = 999999, maxX = -999999, maxY = -999999;
-                            
-                            for (let i = 0; i < monitorsModel.count; i++) {
-                                let m = monitorsModel.get(i);
-                                let isP = m.transform === 1 || m.transform === 3;
-                                let w = ((isP ? m.resH : m.resW) / m.sysScale) * window.uiScale;
-                                let h = ((isP ? m.resW : m.resH) / m.sysScale) * window.uiScale;
-                                
-                                minX = Math.min(minX, m.uiX);
-                                minY = Math.min(minY, m.uiY);
-                                maxX = Math.max(maxX, m.uiX + w);
-                                maxY = Math.max(maxY, m.uiY + h);
-                            }
-                            
-                            let requiredW = (maxX - minX) + window.s(80);
-                            let requiredH = (maxY - minY) + window.s(80);
-                            
-                            return Math.min(1.8 * scaler.baseScale, Math.min(window.s(340) / requiredW, window.s(240) / requiredH));
-                        }
-
-                        property real offsetX: {
-                            if (monitorsModel.count < 2) return 0;
-                            let minX = 999999, maxX = -999999;
-                            
-                            for (let i = 0; i < monitorsModel.count; i++) {
-                                let m = monitorsModel.get(i);
-                                let isP = m.transform === 1 || m.transform === 3;
-                                let w = ((isP ? m.resH : m.resW) / m.sysScale) * window.uiScale;
-                                
-                                minX = Math.min(minX, m.uiX);
-                                maxX = Math.max(maxX, m.uiX + w);
-                            }
-                            
-                            let centerX = minX + (maxX - minX) / 2;
-                            return window.s(190) - (centerX * targetScale);
-                        }
-
-                        property real offsetY: {
-                            if (monitorsModel.count < 2) return 0;
-                            let minY = 999999, maxY = -999999;
-                            
-                            for (let i = 0; i < monitorsModel.count; i++) {
-                                let m = monitorsModel.get(i);
-                                let isP = m.transform === 1 || m.transform === 3;
-                                let h = ((isP ? m.resW : m.resH) / m.sysScale) * window.uiScale;
-                                
-                                minY = Math.min(minY, m.uiY);
-                                maxY = Math.max(maxY, m.uiY + h);
-                            }
-                            
-                            let centerY = minY + (maxY - minY) / 2;
-                            return window.s(140) - (centerY * targetScale);
-                        }
-
-                        Item {
-                            id: transformNode
-                            x: multiMonitorView.offsetX
-                            y: multiMonitorView.offsetY
-                            scale: multiMonitorView.targetScale
-                            transformOrigin: Item.TopLeft
-
-                            Behavior on x { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-                            Behavior on y { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-                            Behavior on scale { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-
-                            Repeater {
-                                id: monitorRepeater
-                                model: monitorsModel
-
-                                Item {
-                                    property bool isActive: window.activeEditIndex === index
-                                    property bool isPortrait: model.transform === 1 || model.transform === 3
-
-                                    // THE VISIBLE SNAPPED MONITOR CARD
-                                    Rectangle {
-                                        id: monitorCard
-                                        x: model.uiX
-                                        y: model.uiY
-                                        
-                                        width: (isPortrait ? model.resH : model.resW) / model.sysScale * window.uiScale
-                                        height: (isPortrait ? model.resW : model.resH) / model.sysScale * window.uiScale
-                                        
-                                        radius: window.s(8)
-                                        color: isActive ? window.surface1 : window.crust
-                                        border.color: isActive ? window.selectedResAccent : window.surface2
-                                        border.width: isActive ? window.s(2) : window.s(1)
-                                        z: isActive ? 5 : 0
-
-                                        Behavior on x { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
-                                        Behavior on y { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
-                                        
-                                        Behavior on border.color { ColorAnimation { duration: 300 } }
-                                        Behavior on color { ColorAnimation { duration: 300 } }
-                                        Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-                                        Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-
-                                        Item {
-                                            anchors.centerIn: parent
-                                            width: window.s(110)
-                                            height: window.s(80)
-                                            
-                                            property real idealScale: 1.2 / transformNode.scale
-                                            // Ensure the bounded box checks against the correct axis when visually rotated
-                                            property real maxPhysicalScale: isPortrait 
-                                                ? Math.min((parent.width * 0.9) / height, (parent.height * 0.9) / width) 
-                                                : Math.min((parent.width * 0.9) / width, (parent.height * 0.9) / height)
-                                            
-                                            scale: Math.min(idealScale, maxPhysicalScale)
-                                            
-                                            ColumnLayout {
-                                                anchors.centerIn: parent
-                                                spacing: window.s(2)
-                                                
-                                                // Restored Rotation for Multi-Monitor cards
-                                                rotation: model.transform * 90
-                                                Behavior on rotation { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
-
-                                                Text { 
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    font.family: "Iosevka Nerd Font"
-                                                    font.pixelSize: window.s(32)
-                                                    color: isActive ? window.selectedResAccent : window.text
-                                                    text: "󰍹"
-                                                    Behavior on color { ColorAnimation { duration: 300 } } 
-                                                }
-                                                Text { 
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    font.family: "JetBrains Mono"
-                                                    font.weight: Font.Black
-                                                    font.pixelSize: window.s(13)
-                                                    color: window.text
-                                                    text: model.name 
-                                                }
-                                                Text { 
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    font.family: "JetBrains Mono"
-                                                    font.pixelSize: window.s(10)
-                                                    color: window.subtext0
-                                                    text: model.resW + "x" + model.resH + " @ " + model.rate + "Hz" 
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // THE INVISIBLE GHOST DRAGGER
-                                    Item {
-                                        id: ghostDrag
-                                        x: model.uiX
-                                        y: model.uiY
-                                        width: monitorCard.width
-                                        height: monitorCard.height
-                                        z: isActive ? 10 : 1
-
-                                        MouseArea {
-                                            id: ghostMa
-                                            anchors.fill: parent
-                                            drag.target: ghostDrag
-                                            drag.axis: Drag.XAndYAxis
-                                            
-                                            onPressed: {
-                                                window.activeEditIndex = index;
-                                                ghostDrag.x = model.uiX;
-                                                ghostDrag.y = model.uiY;
-                                            }
-
-                                            onPositionChanged: {
-                                                if (drag.active && monitorsModel.count >= 2) {
-                                                    let mW = monitorCard.width;
-                                                    let mH = monitorCard.height;
-
-                                                    let padding = window.s(40);
-                                                    let boundMinX = 999999, boundMinY = 999999;
-                                                    let boundMaxX = -999999, boundMaxY = -999999;
-                                                    
-                                                    for (let j = 0; j < monitorsModel.count; j++) {
-                                                        if (j === index) continue;
-                                                        let sModel = monitorsModel.get(j);
-                                                        let sIsP = sModel.transform === 1 || sModel.transform === 3;
-                                                        let sW = ((sIsP ? sModel.resH : sModel.resW) / sModel.sysScale) * window.uiScale;
-                                                        let sH = ((sIsP ? sModel.resW : sModel.resH) / sModel.sysScale) * window.uiScale;
-                                                        
-                                                        boundMinX = Math.min(boundMinX, sModel.uiX - mW - padding);
-                                                        boundMinY = Math.min(boundMinY, sModel.uiY - mH - padding);
-                                                        boundMaxX = Math.max(boundMaxX, sModel.uiX + sW + padding);
-                                                        boundMaxY = Math.max(boundMaxY, sModel.uiY + sH + padding);
-                                                    }
-
-                                                    ghostDrag.x = Math.max(boundMinX, Math.min(ghostDrag.x, boundMaxX));
-                                                    ghostDrag.y = Math.max(boundMinY, Math.min(ghostDrag.y, boundMaxY));
-
-                                                    let bestX = ghostDrag.x;
-                                                    let bestY = ghostDrag.y;
-                                                    let bestDist = 999999;
-                                                    
-                                                    for (let j = 0; j < monitorsModel.count; j++) {
-                                                        if (j === index) continue;
-                                                        let sModel = monitorsModel.get(j);
-                                                        let sIsP = sModel.transform === 1 || sModel.transform === 3;
-                                                        let sW = ((sIsP ? sModel.resH : sModel.resW) / sModel.sysScale) * window.uiScale;
-                                                        let sH = ((sIsP ? sModel.resW : sModel.resH) / sModel.sysScale) * window.uiScale;
-                                                        
-                                                        let snapped = window.getPerimeterSnap(
-                                                            ghostDrag.x, ghostDrag.y,
-                                                            sModel.uiX, sModel.uiY,
-                                                            sW, sH, mW, mH, window.s(20)
-                                                        );
-                                                        
-                                                        let dist = Math.hypot(ghostDrag.x - snapped.x, ghostDrag.y - snapped.y);
-                                                        if (dist < bestDist) {
-                                                            bestDist = dist;
-                                                            bestX = snapped.x;
-                                                            bestY = snapped.y;
-                                                        }
-                                                    }
-
-                                                    if (!window.isOverlappingAny(bestX, bestY, mW, mH, index)) {
-                                                        monitorsModel.setProperty(index, "uiX", bestX);
-                                                        monitorsModel.setProperty(index, "uiY", bestY);
-                                                    }
-                                                }
-                                            }
-
-                                            onReleased: {
-                                                ghostDrag.x = model.uiX;
-                                                ghostDrag.y = model.uiY;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ==========================================
-            // INTERACTIVE SELECTION GRIDS
-            // ==========================================
-            Item {
-                anchors.left: leftVisualArea.right
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.verticalCenterOffset: window.s(-10) // Tweak layout slightly downwards 
-                anchors.leftMargin: window.s(10)
-                anchors.rightMargin: window.s(30)
-                height: rightSideContainer.implicitHeight 
-
-                opacity: window.introProgress
-                transform: Translate { y: window.uiYOffset }
-
-                SequentialAnimation {
-                    id: menuTransitionAnim
-                    ParallelAnimation {
-                        ScaleAnimator { 
-                            target: rightSideContainer
-                            from: 0.99
-                            to: 1.0
-                            duration: 200
-                            easing.type: Easing.OutSine 
-                        }
-                        NumberAnimation { 
-                            target: highlightFlash
-                            property: "opacity"
-                            from: 0.05
-                            to: 0.0
-                            duration: 250
-                            easing.type: Easing.OutQuad 
-                        }
-                    }
-                }
-
-                Rectangle {
-                    id: highlightFlash
-                    anchors.fill: rightSideContainer
-                    anchors.margins: window.s(-10)
-                    color: window.selectedResAccent
-                    opacity: 0.0
-                    radius: window.s(12)
-                }
-
-                ColumnLayout {
-                    id: rightSideContainer
-                    anchors.fill: parent
-                    spacing: window.s(10)
-
-                    // --- RESOLUTION CARDS SECTION ---
-                    GridLayout {
-                        id: resGrid
-                        Layout.fillWidth: true
-                        columns: 2
-                        columnSpacing: window.s(10)
-                        rowSpacing: window.s(10)
-
-                        Repeater {
-                            model: window.resList
-
-                            delegate: Rectangle {
-                                property var modelData: window.resList[index]
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: window.s(45)
-                                radius: window.s(12)
-                                
-                                property bool isSel: {
-                                    if (monitorsModel.count === 0) return false;
-                                    let activeMon = monitorsModel.get(window.activeEditIndex);
-                                    return activeMon.resW === modelData.w && activeMon.resH === modelData.h;
-                                }
-                                property color accentColor: modelData.accent
-                                
-                                color: isSel ? Qt.alpha(accentColor, 0.15) : (resMa.containsMouse ? window.surface0 : window.mantle)
-                                border.color: isSel ? accentColor : (resMa.containsMouse ? window.surface1 : "transparent")
-                                border.width: isSel ? window.s(2) : window.s(1)
-                                
-                                Behavior on color { ColorAnimation { duration: 200 } }
-                                Behavior on border.color { ColorAnimation { duration: 200 } }
-
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.margins: window.s(12)
-                                    spacing: window.s(8)
-                                    
-                                    Text { 
-                                        font.family: "JetBrains Mono"
-                                        font.weight: isSel ? Font.Black : Font.Bold
-                                        font.pixelSize: window.s(15)
-                                        color: isSel ? accentColor : window.text
-                                        text: modelData.l
-                                        Behavior on color { ColorAnimation { duration: 200 } } 
-                                    }
-                                    
-                                    Item { Layout.fillWidth: true } 
-                                    
-                                    Text { 
-                                        font.family: "JetBrains Mono"
-                                        font.pixelSize: window.s(11)
-                                        color: isSel ? window.text : window.overlay0
-                                        text: modelData.w + "x" + modelData.h
-                                        Behavior on color { ColorAnimation { duration: 200 } } 
-                                    }
-                                }
-
-                                scale: resMa.pressed ? 0.96 : 1.0
-                                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutSine } }
-
-                                MouseArea {
-                                    id: resMa
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        window.activeFocusIndex = 0;
-                                        if (monitorsModel.count > 0) {
-                                            window.selectedResAccent = accentColor;
-                                            monitorsModel.setProperty(window.activeEditIndex, "resW", modelData.w);
-                                            monitorsModel.setProperty(window.activeEditIndex, "resH", modelData.h);
-                                            delayedLayoutUpdate.restart();
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Item { Layout.preferredHeight: window.s(2) } 
-
-                    // --- ROTATION DIAL (CLOCK-STYLE) SECTION ---
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: window.s(120)
-                        
-                        Item { Layout.fillWidth: true }
-
-                        Rectangle {
-                            id: clockDial
-                            // Use Layout properties instead of standard width/height to prevent 
-                            // the layout engine from breaking your dimensions during resize
-                            Layout.preferredWidth: window.s(120)
-                            Layout.preferredHeight: window.s(120)
-                            Layout.alignment: Qt.AlignCenter
-                            
-                            radius: width / 2
-                            color: window.surface0 
-                            
-                            border.color: window.activeFocusIndex === 1 ? window.selectedResAccent : window.surface1 
-                            border.width: window.activeFocusIndex === 1 ? window.s(3) : window.s(2)
-                            Behavior on border.color { ColorAnimation { duration: 200 } }
-                            Behavior on border.width { NumberAnimation { duration: 200 } }
-
-                            // 12-Hour Clock Tick Marks
-                            Repeater {
-                                model: 12
-                                Item {
-                                    anchors.fill: parent
-                                    rotation: index * 30
-                                    Rectangle {
-                                        width: index % 3 === 0 ? window.s(4) : window.s(2)
-                                        height: index % 3 === 0 ? window.s(8) : window.s(4)
-                                        radius: width / 2
-                                        color: index % 3 === 0 ? window.subtext0 : window.surface2 
-                                        anchors.top: parent.top
-                                        anchors.topMargin: window.s(4)
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                    }
-                                }
-                            }
-
-                            // The Interactive Pointer
-                            Item {
-                                id: dialPointer
-                                anchors.fill: parent
-                                property int activeTransform: monitorsModel.count > 0 ? monitorsModel.get(window.activeEditIndex).transform : 0
-                                rotation: activeTransform * 90
-                                Behavior on rotation { NumberAnimation { duration: 400; easing.type: Easing.OutBack;} }
-
-                                // Pointer Line
-                                Rectangle {
-                                    width: window.s(5)
-                                    height: parent.height / 2 - window.s(20)
-                                    radius: window.s(2.5)
-                                    color: window.selectedResAccent
-                                    anchors.bottom: parent.verticalCenter
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    Behavior on color { ColorAnimation { duration: 300 } }
-                                }
-                                
-                                // Center Dot
-                                Rectangle {
-                                    width: window.s(18)
-                                    height: window.s(18) // Replaced height: width binding
-                                    radius: width / 2
-                                    color: window.base
-                                    border.color: window.selectedResAccent
-                                    border.width: window.s(4)
-                                    anchors.centerIn: parent
-                                    Behavior on border.color { ColorAnimation { duration: 300 } }
-                                }
-                            }
-
                             MouseArea {
-                                id: dialMa
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-
-                                function updateAngle(mouse) {
-                                    if (monitorsModel.count === 0) return;
-                                    window.activeFocusIndex = 1;
-                                    
-                                    let dx = mouse.x - width / 2;
-                                    let dy = mouse.y - height / 2;
-
-                                    if (Math.hypot(dx, dy) < window.s(20)) return;
-
-                                    let snap = 0;
-                                    if (Math.abs(dx) > Math.abs(dy)) {
-                                        snap = dx > 0 ? 1 : 3;
-                                    } else {
-                                        snap = dy > 0 ? 2 : 0;
-                                    }
-                                    
-                                    monitorsModel.setProperty(window.activeEditIndex, "transform", snap);
+                                id: resMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    window.activeFocusIndex = 0;
+                                    monitorsModel.setProperty(window.activeEditIndex, "resW", modelData.w);
+                                    monitorsModel.setProperty(window.activeEditIndex, "resH", modelData.h);
                                     delayedLayoutUpdate.restart();
                                 }
-
-                                onPressed: (mouse) => updateAngle(mouse)
-                                onPositionChanged: (mouse) => { if (pressed) updateAngle(mouse) }
                             }
-                        }
-
-                        Item { Layout.fillWidth: true }
-                    }                    Item { Layout.preferredHeight: window.s(2) }
-
-                    // --- REFRESH RATE SLIDER SECTION ---
-                    Item {
-                        id: sliderContainer
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: window.s(45)
-                        Layout.leftMargin: window.s(6)
-                        Layout.rightMargin: window.s(6)
-                        
-                        property var rates: [60, 75, 100, 120, 144, 165, 180, 240, 360]
-                        property var rateColors: [window.red, window.mauve, window.blue, window.sapphire, window.teal, window.pink, window.yellow, window.green, window.peach]
-                        
-                        property int currentIndex: {
-                            if (monitorsModel.count === 0) return 0;
-                            let currentVal = parseInt(monitorsModel.get(window.activeEditIndex).rate) || 60;
-                            let closestIdx = 0;
-                            let minDiff = 9999;
-                            for (let i = 0; i < rates.length; i++) {
-                                let diff = Math.abs(rates[i] - currentVal);
-                                if (diff < minDiff) { 
-                                    minDiff = diff; 
-                                    closestIdx = i; 
-                                }
-                            }
-                            return closestIdx;
-                        }
-
-                        property real visualPct: currentIndex / (rates.length - 1)
-
-                        onCurrentIndexChanged: { 
-                            if (!sliderMa.pressed) visualPct = currentIndex / (rates.length - 1); 
-                        }
-                        
-                        function updateSelectionVisual(idx) {
-                            if (monitorsModel.count === 0) return;
-                            visualPct = idx / (rates.length - 1);
-                            monitorsModel.setProperty(window.activeEditIndex, "rate", rates[idx].toString());
-                            window.selectedRateAccent = rateColors[idx];
-                        }
-
-                        Rectangle {
-                            id: track
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.leftMargin: window.s(15)
-                            anchors.rightMargin: window.s(15)
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.verticalCenterOffset: window.s(-10)
-                            height: window.s(12)
-                            radius: window.s(6)
-                            color: window.mantle
-                            border.color: window.crust
-                            border.width: 1
-                            
-                            Rectangle { 
-                                id: trackFill
-                                width: Math.max(0, knob.x + knob.width / 2)
-                                height: parent.height
-                                radius: parent.radius
-                                color: window.selectedRateAccent
-                                Behavior on color { ColorAnimation { duration: 200 } } 
-                            }
-
-                            Rectangle {
-                                id: knob
-                                width: window.s(24)
-                                height: window.s(24)
-                                radius: window.s(12)
-                                color: sliderMa.containsPress ? window.selectedRateAccent : window.text
-                                anchors.verticalCenter: parent.verticalCenter
-                                x: (sliderContainer.visualPct * parent.width) - width / 2
-                                
-                                Behavior on x { 
-                                    enabled: !sliderMa.pressed
-                                    NumberAnimation { duration: 250; easing.type: Easing.OutCubic } 
-                                }
-                                Behavior on color { ColorAnimation { duration: 150 } }
-                                
-                                border.width: (sliderMa.containsMouse || window.activeFocusIndex === 2) ? window.s(4) : 0
-                                border.color: Qt.alpha(window.selectedRateAccent, 0.4)
-                                Behavior on border.width { NumberAnimation { duration: 150 } }
-                            }
-                        }
-
-                        Repeater {
-                            model: sliderContainer.rates.length
-                            Item {
-                                x: track.x + (index / (sliderContainer.rates.length - 1)) * track.width
-                                y: track.y + window.s(20)
-                                
-                                Text { 
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    text: sliderContainer.rates[index]
-                                    font.family: "JetBrains Mono"
-                                    font.pixelSize: window.s(13)
-                                    font.weight: sliderContainer.currentIndex === index ? Font.Bold : Font.Normal
-                                    color: sliderContainer.currentIndex === index ? window.selectedRateAccent : window.overlay0
-                                    Behavior on color { ColorAnimation { duration: 200 } } 
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            id: sliderMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-
-                            function updateSelection(mouseX, snapToGrid) {
-                                if (monitorsModel.count === 0) return;
-                                window.activeFocusIndex = 2;
-                                
-                                let pct = (mouseX - track.x) / track.width;
-                                pct = Math.max(0, Math.min(1, pct));
-                                let idx = Math.round(pct * (sliderContainer.rates.length - 1));
-                                
-                                if (snapToGrid) {
-                                    sliderContainer.visualPct = idx / (sliderContainer.rates.length - 1);
-                                } else {
-                                    sliderContainer.visualPct = pct;
-                                }
-
-                                monitorsModel.setProperty(window.activeEditIndex, "rate", sliderContainer.rates[idx].toString());
-                                window.selectedRateAccent = sliderContainer.rateColors[idx];
-                            }
-
-                            onPressed: (mouse) => updateSelection(mouse.x, false)
-                            onPositionChanged: (mouse) => { if (pressed) updateSelection(mouse.x, false) }
-                            onReleased: (mouse) => updateSelection(mouse.x, true)
-                            onCanceled: () => sliderContainer.visualPct = sliderContainer.currentIndex / (sliderContainer.rates.length - 1)
-                        }
-                    }
-
-                    Item { Layout.preferredHeight: window.s(15) }
-
-                    // --- PRIMARY MONITOR TOGGLE ---
-                    Item {
-                        id: primaryToggle
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: window.s(40)
-                        visible: monitorsModel.count > 0
-
-                        property bool isPrimary: monitorsModel.count > 0 && monitorsModel.get(window.activeEditIndex).primary
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: window.s(10)
-                            color: primaryToggle.isPrimary ? Qt.alpha(window.yellow, 0.15) : window.mantle
-                            border.color: primaryToggle.isPrimary ? window.yellow : window.surface1
-                            border.width: primaryToggle.isPrimary ? window.s(2) : window.s(1)
-                            Behavior on color { ColorAnimation { duration: 200 } }
-                            Behavior on border.color { ColorAnimation { duration: 200 } }
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.margins: window.s(12)
-                                spacing: window.s(8)
-
-                                Text {
-                                    font.family: "Iosevka Nerd Font"
-                                    font.pixelSize: window.s(16)
-                                    color: primaryToggle.isPrimary ? window.yellow : window.subtext0
-                                    text: primaryToggle.isPrimary ? "󰓎" : "󰓏"
-                                    Behavior on color { ColorAnimation { duration: 200 } }
-                                }
-                                Text {
-                                    font.family: "JetBrains Mono"
-                                    font.pixelSize: window.s(13)
-                                    font.weight: Font.Bold
-                                    color: primaryToggle.isPrimary ? window.yellow : window.text
-                                    text: primaryToggle.isPrimary ? "Primary Monitor" : "Set as Primary"
-                                    Behavior on color { ColorAnimation { duration: 200 } }
-                                }
-                                Item { Layout.fillWidth: true }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (monitorsModel.count === 0) return;
-                                    let newVal = !monitorsModel.get(window.activeEditIndex).primary;
-                                    for (let i = 0; i < monitorsModel.count; i++) {
-                                        monitorsModel.setProperty(i, "primary", false);
-                                    }
-                                    if (newVal) {
-                                        monitorsModel.setProperty(window.activeEditIndex, "primary", true);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Item { Layout.preferredHeight: window.s(6) }
-
-                    // ==========================================
-                    // FLOATING APPLY BUTTON
-                    // ==========================================
-                    Item {
-                        id: applyButtonContainer
-                        Layout.alignment: Qt.AlignRight
-                        Layout.preferredWidth: window.s(170)
-                        Layout.preferredHeight: window.s(50)
-
-                        MultiEffect {
-                            source: applyBtn
-                            anchors.fill: applyBtn
-                            shadowEnabled: true
-                            shadowColor: window.selectedRateAccent
-                            shadowBlur: window.applyHovered || window.activeFocusIndex === 3 ? 1.2 : 0.6
-                            shadowOpacity: window.applyHovered || window.activeFocusIndex === 3 ? 0.6 : 0.2
-                            shadowVerticalOffset: window.s(4)
-                            z: -1
-                            Behavior on shadowBlur { NumberAnimation { duration: 300 } } 
-                            Behavior on shadowOpacity { NumberAnimation { duration: 300 } } 
-                            Behavior on shadowColor { ColorAnimation { duration: 400 } }
-                        }
-
-                        Rectangle {
-                            id: applyBtn
-                            anchors.fill: parent
-                            radius: window.s(25)
-                            
-                            gradient: Gradient { 
-                                orientation: Gradient.Horizontal
-                                GradientStop { 
-                                    position: 0.0
-                                    color: window.selectedResAccent
-                                    Behavior on color { ColorAnimation { duration: 400 } } 
-                                } 
-                                GradientStop { 
-                                    position: 1.0
-                                    color: window.selectedRateAccent
-                                    Behavior on color { ColorAnimation { duration: 400 } } 
-                                } 
-                            }
-                            
-                            border.color: window.activeFocusIndex === 3 ? window.crust : "transparent"
-                            border.width: window.activeFocusIndex === 3 ? window.s(2) : 0
-                            
-                            scale: window.applyPressed ? 0.94 : (window.applyHovered || window.activeFocusIndex === 3 ? 1.04 : 1.0)
-                            Behavior on scale { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
-
-                            Rectangle {
-                                id: flashRect
-                                anchors.fill: parent
-                                radius: window.s(25)
-                                color: window.text
-                                opacity: 0.0
-                                PropertyAnimation on opacity { 
-                                    id: applyFlashAnim
-                                    to: 0.0
-                                    duration: 400
-                                    easing.type: Easing.OutExpo 
-                                }
-                            }
-
-                            RowLayout {
-                                anchors.centerIn: parent
-                                spacing: window.s(8)
-                                
-                                Text { 
-                                    font.family: "Iosevka Nerd Font"
-                                    font.pixelSize: window.s(20)
-                                    color: window.crust
-                                    text: "󰸵" 
-                                }
-                                
-                                Text { 
-                                    font.family: "JetBrains Mono"
-                                    font.weight: Font.Black
-                                    font.pixelSize: window.s(14)
-                                    color: window.crust
-                                    text: monitorsModel.count > 1 ? "Apply All" : "Apply" 
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            id: applyMa
-                            anchors.fill: parent
-                            z: 10
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            
-                            onEntered: { window.applyHovered = true; window.activeFocusIndex = 3; }
-                            onExited: window.applyHovered = false
-                            onPressed: window.applyPressed = true
-                            onReleased: window.applyPressed = false
-                            onCanceled: window.applyPressed = false
-
-                            onClicked: window.triggerApply()
                         }
                     }
                 }
+            }
+
+            // Vertical divider
+            Rectangle {
+                anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
+                width: 1; color: panel.sep
+            }
+
+            // ── TRANSFORM + RATE ──────────────────────────────────────────────
+            Item {
+                id: rightControls
+                anchors.top: parent.top; anchors.left: parent.horizontalCenter; anchors.right: parent.right; anchors.topMargin: 8; anchors.leftMargin: 4; anchors.rightMargin: 10
+
+                // Transform
+                Text {
+                    id: tfLabel
+                    anchors.top: parent.top; anchors.left: parent.left
+                    text: "─[ ORIENTATION" + (window.activeFocusIndex === 1 ? " ◂ACTIVE" : "") + " ]"
+                    font.family: "JetBrains Mono"; font.pixelSize: 8; color: window.activeFocusIndex === 1 ? panel.accent : panel.dim
+                }
+
+                Row {
+                    id: tfRow
+                    anchors.top: tfLabel.bottom; anchors.left: parent.left; anchors.topMargin: 4
+                    spacing: 4
+
+                    Repeater {
+                        model: [
+                            { label: "0°",   tf: 0 },
+                            { label: "90°",  tf: 1 },
+                            { label: "180°", tf: 2 },
+                            { label: "270°", tf: 3 }
+                        ]
+                        Item {
+                            width: 46; height: 22
+                            required property var modelData
+
+                            property bool isCurrent: monitorsModel.count > 0 &&
+                                                     monitorsModel.get(window.activeEditIndex).displayTransform === modelData.tf
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: isCurrent ? panel.accent : (tfMa.containsMouse ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.15) : "transparent")
+                                border.color: isCurrent ? panel.accent : panel.sep; border.width: 1
+                            }
+                            Text { anchors.centerIn: parent; text: modelData.label; font.family: "JetBrains Mono"; font.pixelSize: 9; color: isCurrent ? panel.bg : panel.dim }
+                            MouseArea {
+                                id: tfMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    window.activeFocusIndex = 1;
+                                    monitorsModel.setProperty(window.activeEditIndex, "displayTransform", modelData.tf);
+                                    delayedLayoutUpdate.restart();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Rate
+                Text {
+                    id: rateLabel2
+                    anchors.top: tfRow.bottom; anchors.left: parent.left; anchors.topMargin: 10
+                    text: "─[ REFRESH RATE" + (window.activeFocusIndex === 2 ? " ◂ACTIVE" : "") + " ]"
+                    font.family: "JetBrains Mono"; font.pixelSize: 8; color: window.activeFocusIndex === 2 ? panel.accent : panel.dim
+                }
+
+                Flow {
+                    anchors.top: rateLabel2.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.topMargin: 4
+                    spacing: 4
+
+                    Repeater {
+                        model: window.ratesList
+                        Item {
+                            width: 46; height: 22
+                            required property int modelData
+                            required property int index
+
+                            property bool isCurrent: monitorsModel.count > 0 &&
+                                                     Math.round(parseInt(monitorsModel.get(window.activeEditIndex).rate)) === modelData
+
+                            Rectangle {
+                                anchors.fill: parent
+                                color: isCurrent ? panel.accent : (rateMa.containsMouse ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.15) : "transparent")
+                                border.color: isCurrent ? panel.accent : panel.sep; border.width: 1
+                            }
+                            Text { anchors.centerIn: parent; text: modelData; font.family: "JetBrains Mono"; font.pixelSize: 9; color: isCurrent ? panel.bg : panel.dim }
+                            MouseArea {
+                                id: rateMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: { window.activeFocusIndex = 2; window.updateRateSelection(index); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            id: applySep
+            anchors.bottom: parent.bottom; anchors.bottomMargin: 62; anchors.left: parent.left; anchors.right: parent.right
+            height: 1; color: panel.sep
+        }
+
+        // ── APPLY BUTTON ──────────────────────────────────────────────────────
+        Item {
+            id: applySection
+            anchors.bottom: parent.bottom; anchors.bottomMargin: 26; anchors.left: parent.left; anchors.right: parent.right
+            height: 36
+
+            Item {
+                anchors.centerIn: parent
+                width: 160; height: 26
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: window.applyPressed
+                           ? panel.accent
+                           : (window.activeFocusIndex === 3 || applyMa.containsMouse
+                              ? Qt.rgba(panel.accent.r, panel.accent.g, panel.accent.b, 0.2)
+                              : "transparent")
+                    border.color: panel.accent; border.width: 1
+                }
+                Text {
+                    anchors.centerIn: parent
+                    text: "APPLY CHANGES"
+                    font.family: "JetBrains Mono"; font.pixelSize: 11; font.letterSpacing: 1.0
+                    color: window.applyPressed ? panel.bg : panel.accent
+                }
+                MouseArea {
+                    id: applyMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onEntered: { window.applyHovered = true; window.activeFocusIndex = 3; }
+                    onExited:  { window.applyHovered = false; }
+                    onPressed: { window.applyPressed = true; window.triggerApply(); }
+                    onReleased: { window.applyPressed = false; }
+                }
+            }
+        }
+
+        // ── FOOTER ────────────────────────────────────────────────────────────
+        Item {
+            id: monFooter
+            anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
+            height: 26
+            Rectangle { anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: panel.sep }
+            Row {
+                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; anchors.leftMargin: 10
+                spacing: 0
+                Text { text: "Tab";      font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.accent }
+                Text { text: " focus  "; font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.dim }
+                Text { text: "↑↓←→";   font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.accent }
+                Text { text: " change  "; font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.dim }
+                Text { text: "Enter";   font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.accent }
+                Text { text: " apply  "; font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.dim }
+                Text { text: "Esc";     font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.accent }
+                Text { text: " close";  font.family: "JetBrains Mono"; font.pixelSize: 10; color: panel.dim }
             }
         }
     }

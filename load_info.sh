@@ -217,9 +217,9 @@ mkdir -p "$(dirname "$SETTINGS_JSON")"
 [ ! -f "$SETTINGS_JSON" ] && echo "{}" > "$SETTINGS_JSON"
 
 if [[ "$GPU_MODE" == nvidia || "$GPU_MODE" == prime-nvidia-amd || "$GPU_MODE" == prime-nvidia-intel ]]; then
-  HW_ENVS='["GBM_BACKEND=nvidia-drm","__GLX_VENDOR_LIBRARY_NAME=nvidia","WLR_NO_HARDWARE_CURSORS=1","LIBVA_DRIVER_NAME=nvidia"]'
+  HW_ENVS='["env = GBM_BACKEND,nvidia-drm","env = __GLX_VENDOR_LIBRARY_NAME,nvidia","env = WLR_NO_HARDWARE_CURSORS,1","env = LIBVA_DRIVER_NAME,nvidia"]'
 elif [[ "$GPU_MODE" == amd ]]; then
-  HW_ENVS='["LIBVA_DRIVER_NAME=radeonsi"]'
+  HW_ENVS='["env = LIBVA_DRIVER_NAME,radeonsi"]'
 else
   HW_ENVS='[]'
 fi
@@ -275,15 +275,21 @@ if [ -f "$USER_SETTINGS_JSON" ]; then
   chmod 644 "$USER_SETTINGS_JSON"
   echo "Input sensitivity written to settings.json (mouse: $CURRENT_MOUSE_SENSITIVITY, touchpad: $CURRENT_TOUCHPAD_SENSITIVITY, device: $TOUCHPAD_MOUSE_DEV)"
 
-  # Immediately recompile niri config and reload — don't wait for inotify watcher
+  # Immediately recompile Hyprland configs and reload — don't wait for inotify watcher
   WATCHER_SCRIPT="$USER_HOME/.config/hypr/scripts/settings_watcher.sh"
   if [ -f "$WATCHER_SCRIPT" ]; then
     sudo -u "$CURRENT_USER" bash "$WATCHER_SCRIPT" --compile
-    echo "Niri config recompiled."
+    echo "Hyprland configs recompiled."
   fi
 
-  # Reload niri if running (full path needed — root's PATH omits /run/current-system/sw/bin)
-  sudo -u "$CURRENT_USER" env PATH="/run/current-system/sw/bin:/run/wrappers/bin:$PATH" \
-    niri msg action load-config-file 2>/dev/null && \
-    echo "Niri config reloaded." || echo "Niri not running — config will be picked up on next start."
+  # Reload Hyprland — enumerate sockets since HYPRLAND_INSTANCE_SIGNATURE may not be set
+  _hypr_sock_dir="/run/user/$(id -u "$CURRENT_USER")/hypr"
+  if [ -d "$_hypr_sock_dir" ]; then
+    for _inst_dir in "$_hypr_sock_dir"/*/; do
+      [ -d "$_inst_dir" ] || continue
+      _inst=$(basename "$_inst_dir")
+      sudo -u "$CURRENT_USER" env HYPRLAND_INSTANCE_SIGNATURE="$_inst" hyprctl reload 2>/dev/null && \
+        echo "Hyprland reloaded (instance: $_inst)" && break
+    done
+  fi
 fi

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 
-niri msg action toggle-window-floating
-niri msg action set-column-width "1111px"
+hyprctl dispatch togglefloating
+hyprctl dispatch resizeactive exact 1111 700
+hyprctl dispatch centerwindow

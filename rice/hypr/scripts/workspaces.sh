@@ -8,6 +8,8 @@ qs_ensure_cache "workspaces"
 
 # ============================================================================
 # 1. ZOMBIE PREVENTION
+# Kills any older instances of this script. When Quickshell reloads, 
+# it can leave the old listener pipelines running in the background infinitely.
 # ============================================================================
 for pid in $(pgrep -f "workspaces.sh"); do
     if [ "$pid" != "$$" ] && [ "$pid" != "$PPID" ]; then
@@ -15,81 +17,88 @@ for pid in $(pgrep -f "workspaces.sh"); do
     fi
 done
 
+# Cleanly kill immediate children (like socat) when the script exits normally
 cleanup() {
     pkill -P $$ 2>/dev/null
 }
 trap cleanup EXIT SIGTERM SIGINT
 
 # --- Special Cleanup for Network/Bluetooth ---
+# The network toggle starts a background bluetooth scan that must be killed explicitly.
 BT_PID_FILE="$QS_RUN_WORKSPACES/bt_scan_pid"
+
 if [ -f "$BT_PID_FILE" ]; then
     kill $(cat "$BT_PID_FILE") 2>/dev/null
     rm -f "$BT_PID_FILE"
 fi
-(timeout 2 bluetoothctl scan off > /dev/null 2>&1) &
 
-# Configuration: parse from settings.json, fallback to 8
+# Ensure bluetooth scan is explicitly turned off (timeout prevents deadlocks on fresh installs)
+(timeout 2 bluetoothctl scan off > /dev/null 2>&1) &
+# ---------------------------------------------
+
+# Configuration: Parse from settings.json dynamically, fallback to 8
 SETTINGS_FILE="$HOME/.config/hypr/settings.json"
 SEQ_END=$(jq -r '.workspaceCount // 8' "$SETTINGS_FILE" 2>/dev/null)
+# Double check it is a valid integer to prevent jq errors later
 if ! [[ "$SEQ_END" =~ ^[0-9]+$ ]]; then
     SEQ_END=8
 fi
 
 print_workspaces() {
-    WORKSPACES=$(timeout 2 niri msg -j workspaces 2>/dev/null)
-    WINDOWS=$(timeout 2 niri msg -j windows 2>/dev/null)
+    # Get raw data with a timeout fallback
+    spaces=$(timeout 2 hyprctl workspaces -j 2>/dev/null)
+    active=$(timeout 2 hyprctl activeworkspace -j 2>/dev/null | jq '.id')
 
-    if [ -z "$WORKSPACES" ]; then return; fi
+    # Failsafe if hyprctl crashes to prevent jq from outputting errors
+    if [ -z "$spaces" ] || [ -z "$active" ]; then return; fi
 
-    jq -n \
-        --argjson ws "$WORKSPACES" \
-        --argjson wins "${WINDOWS:-[]}" \
-        --arg end "$SEQ_END" -c '
-        # Find the focused output
-        ([$ws[] | select(.is_focused)] | .[0] | .output // "") as $focused_output |
-
-        # Workspaces on focused output (fall back to all if nothing focused)
-        (if $focused_output != "" then [$ws[] | select(.output == $focused_output)]
-         else $ws end) as $out_ws |
-
-        # Focused workspace idx on focused output
-        ([$out_ws[] | select(.is_focused)] | .[0] | .idx // 1) as $active_idx |
-
-        # Map workspace id -> window count
-        ($wins | group_by(.workspace_id) |
-            map({(.[0].workspace_id | tostring): length}) | add // {}) as $win_count |
-
-        # Map workspace idx -> workspace id (for focused output)
-        ($out_ws | map({((.idx // 0) | tostring): .id}) | add // {}) as $ws_id_map |
-
+    # Generate the JSON and write it atomically to prevent UI flickering
+    echo "$spaces" | jq --unbuffered --argjson a "$active" --arg end "$SEQ_END" -c '
+        # Create a map of workspace ID -> workspace data for easy lookup
+        (map( { (.id|tostring): . } ) | add) as $s
+        |
+        # Iterate from 1 to SEQ_END
         [range(1; ($end|tonumber) + 1)] | map(
             . as $i |
-            ($ws_id_map[$i|tostring]) as $ws_id |
-            (if $ws_id then ($win_count[$ws_id|tostring] // 0) else 0 end) as $cnt |
-            (if $i == $active_idx then "active"
-             elif $cnt > 0 then "occupied"
+            # Determine state: active -> occupied -> empty
+            (if $i == $a then "active"
+             elif ($s[$i|tostring] != null and $s[$i|tostring].windows > 0) then "occupied"
              else "empty" end) as $state |
-            {id: $i, state: $state, tooltip: ("Workspace " + ($i|tostring))}
-        )
-    ' > "$QS_RUN_WORKSPACES/workspaces.tmp" 2>/dev/null
 
-    [ -f "$QS_RUN_WORKSPACES/workspaces.tmp" ] && \
-        mv "$QS_RUN_WORKSPACES/workspaces.tmp" "$QS_RUN_WORKSPACES/workspaces.json"
+            # Get window title for tooltip (if exists)
+            (if $s[$i|tostring] != null then $s[$i|tostring].lastwindowtitle else "Empty" end) as $win |
+
+            {
+                id: $i,
+                state: $state,
+                tooltip: $win
+            }
+        )
+    ' > "$QS_RUN_WORKSPACES/workspaces.tmp"
+    
+    mv "$QS_RUN_WORKSPACES/workspaces.tmp" "$QS_RUN_WORKSPACES/workspaces.json"
 }
 
 # Print initial state
 print_workspaces
 
 # ============================================================================
-# 2. THE EVENT LISTENER
-# Listen to niri event stream — debounce workspace/window events
+# 2. THE EVENT DEBOUNCER
+# Listen to Hyprland socket wrapped in an infinite loop
 # ============================================================================
 while true; do
-    niri msg event-stream 2>/dev/null | while IFS= read -r line; do
+    socat -u UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock - | while read -r line; do
         case "$line" in
-            *WorkspacesChanged*|*WindowFocusChanged*|*WindowOpenedOrChanged*|*WindowClosed*)
-                # Debounce: discard events arriving within 50ms to prevent CPU storms
-                while IFS= read -t 0.05 -r _; do continue; done
+            workspace*|focusedmon*|activewindow*|createwindow*|closewindow*|movewindow*|destroyworkspace*)
+                
+                # -> THE FIX <-
+                # Hyprland emits HUNDREDS of events a second when you move/resize windows.
+                # This reads and discards all subsequent events arriving within a 50ms window.
+                # It bundles the storm into a single UI update, completely preventing CPU clogging!
+                while read -t 0.05 -r extra_line; do
+                    continue
+                done
+
                 print_workspaces
                 ;;
         esac

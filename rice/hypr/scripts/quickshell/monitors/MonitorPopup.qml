@@ -318,61 +318,45 @@ Item {
     // -------------------------------------------------------------------------
     Process {
         id: displayPoller
-        command: ["niri", "msg", "-j", "outputs"]
+        command: ["hyprctl", "monitors", "-j"]
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
-                    // niri msg -j outputs returns an object keyed by name, not an array
-                    let data = Object.values(JSON.parse(this.text.trim()));
+                    let data = JSON.parse(this.text.trim());
                     monitorsModel.clear();
-
+                    
                     let minX = 999999, minY = 999999;
-                    function niriTransformToInt(t) {
-                        switch(t) {
-                            case "90": return 1; case "180": return 2; case "270": return 3;
-                            case "Flipped": return 4; case "Flipped90": return 5;
-                            case "Flipped180": return 6; case "Flipped270": return 7;
-                            default: return 0; // "Normal"
-                        }
-                    }
 
                     for (let i = 0; i < data.length; i++) {
-                        let lx = data[i].logical ? data[i].logical.x : 0;
-                        let ly = data[i].logical ? data[i].logical.y : 0;
-                        if (lx < minX) minX = lx;
-                        if (ly < minY) minY = ly;
+                        if (data[i].x < minX) minX = data[i].x;
+                        if (data[i].y < minY) minY = data[i].y;
                     }
 
                     window.originalLayoutOriginX = minX !== 999999 ? minX : 0;
                     window.originalLayoutOriginY = minY !== 999999 ? minY : 0;
 
                     for (let i = 0; i < data.length; i++) {
-                        let logi = data[i].logical || {};
-                        // current_mode is an index into modes[], not a mode object
-                        let modeIdx = data[i].current_mode;
-                        let mode = (modeIdx !== null && modeIdx !== undefined && data[i].modes)
-                            ? data[i].modes[modeIdx] : {};
-                        let scl = logi.scale !== undefined ? logi.scale : 1.0;
-                        let tf  = niriTransformToInt(logi.transform);
-                        let lx  = logi.x !== undefined ? logi.x : 0;
-                        let ly  = logi.y !== undefined ? logi.y : 0;
-                        let normalizedX = (lx - minX) * window.uiScale;
-                        let normalizedY = (ly - minY) * window.uiScale;
+                        let scl = data[i].scale !== undefined ? data[i].scale : 1.0;
+                        let tf = data[i].transform !== undefined ? data[i].transform : 0;
+                        let normalizedX = (data[i].x - minX) * window.uiScale;
+                        let normalizedY = (data[i].y - minY) * window.uiScale;
 
                         monitorsModel.append({
                             name: data[i].name,
-                            resW: mode.width || 0,
-                            resH: mode.height || 0,
+                            resW: data[i].width,
+                            resH: data[i].height,
                             sysScale: scl,
-                            rate: Math.round((mode.refresh_rate || 60000) / 1000).toString(),
+                            rate: Math.round(data[i].refreshRate).toString(),
                             uiX: normalizedX,
                             uiY: normalizedY,
                             transform: tf,
                             primary: false
                         });
-                    }
 
+                        if (data[i].focused) window.activeEditIndex = i;
+                    }
+                    
                     window.forceLayoutUpdate();
                     primaryPoller.running = true;
                 } catch(e) {}

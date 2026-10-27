@@ -227,7 +227,7 @@ Item {
             if (m.transform !== 0) monitorStr += ",transform," + m.transform;
             let jsonArr = [{ name: m.name, resW: m.resW, resH: m.resH, rate: parseInt(m.rate), x: 0, y: 0, scale: m.sysScale, transform: m.transform }];
             config.setSetting("monitors", jsonArr);
-            config.sh("pkill swaybg 2>/dev/null; swaybg -i \"$(cat $HOME/.config/hypr/wallpaper)\" -m fill &");
+            config.sh("hyprctl keyword monitor " + monitorStr + " ; awww kill ; sleep 0.2 ; awww-daemon &");
             Quickshell.execDetached(["notify-send", "Display Update", "Applied: " + m.resW + "x" + m.resH + " @ " + m.rate + "Hz"]);
         } else {
             let rects = [];
@@ -277,7 +277,7 @@ Item {
                 jsonArr.push({ name: r.name, resW: r.resW, resH: r.resH, rate: parseInt(r.rate), x: r.x, y: r.y, scale: r.sysScale, transform: r.transform });
             }
             config.setSetting("monitors", jsonArr);
-            config.sh("pkill swaybg 2>/dev/null; swaybg -i \"$(cat $HOME/.config/hypr/wallpaper)\" -m fill &");
+            config.sh("hyprctl --batch '" + batchCmds.join(" ; ") + "' ; awww kill ; sleep 0.2 ; awww-daemon &");
             Quickshell.execDetached(["notify-send", "Display Update", "Applied layout for: " + summaryString.trim()]);
         }
     }
@@ -292,7 +292,7 @@ Item {
     property alias displayPoller: _displayPoller
     Process {
         id: _displayPoller
-        command: ["niri", "msg", "-j", "outputs"]
+        command: ["hyprctl", "monitors", "-j"]
         running: false
         stdout: StdioCollector {
             onStreamFinished: {
@@ -300,38 +300,22 @@ Item {
                     let data = JSON.parse(this.text.trim());
                     config.monitorsModel.clear();
                     let minX = 999999, minY = 999999;
-                    function niriTransformToInt(t) {
-                        switch(t) { case "90": return 1; case "180": return 2; case "270": return 3;
-                            case "flipped": return 4; case "flipped-90": return 5;
-                            case "flipped-180": return 6; case "flipped-270": return 7; default: return 0; }
-                    }
-                    function niriModesToStrings(modes) {
-                        return (modes || []).map(function(m) {
-                            return m.width + "x" + m.height + "@" + (m.refresh_rate / 1000).toFixed(2) + "Hz";
-                        });
-                    }
                     for (let i = 0; i < data.length; i++) {
-                        let lx = data[i].logical ? data[i].logical.x : 0;
-                        let ly = data[i].logical ? data[i].logical.y : 0;
-                        if (lx < minX) minX = lx;
-                        if (ly < minY) minY = ly;
+                        if (data[i].x < minX) minX = data[i].x;
+                        if (data[i].y < minY) minY = data[i].y;
                     }
                     config.monOriginalOriginX = minX !== 999999 ? minX : 0;
                     config.monOriginalOriginY = minY !== 999999 ? minY : 0;
                     for (let i = 0; i < data.length; i++) {
-                        let logi = data[i].logical || {};
-                        let mode = data[i].current_mode || {};
-                        let scl = logi.scale !== undefined ? logi.scale : 1.0;
-                        let tf  = niriTransformToInt(logi.transform);
-                        let lx  = logi.x !== undefined ? logi.x : 0;
-                        let ly  = logi.y !== undefined ? logi.y : 0;
-                        let normalizedX = (lx - minX) * config.monUiScale;
-                        let normalizedY = (ly - minY) * config.monUiScale;
+                        let scl = data[i].scale !== undefined ? data[i].scale : 1.0;
+                        let tf = data[i].transform !== undefined ? data[i].transform : 0;
+                        let normalizedX = (data[i].x - minX) * config.monUiScale;
+                        let normalizedY = (data[i].y - minY) * config.monUiScale;
                         config.monitorsModel.append({
-                            name: data[i].name, resW: mode.width || 0, resH: mode.height || 0,
-                            sysScale: scl, rate: Math.round((mode.refresh_rate || 60000) / 1000).toString(),
+                            name: data[i].name, resW: data[i].width, resH: data[i].height,
+                            sysScale: scl, rate: Math.round(data[i].refreshRate).toString(),
                             uiX: normalizedX, uiY: normalizedY, transform: tf,
-                            availableModes: JSON.stringify(niriModesToStrings(data[i].modes))
+                            availableModes: JSON.stringify(data[i].availableModes || [])
                         });
                         if (data[i].focused) config.monActiveEditIndex = i;
                     }

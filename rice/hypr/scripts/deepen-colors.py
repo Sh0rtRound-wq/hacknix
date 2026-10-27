@@ -30,7 +30,7 @@ def deepen(hex_color):
     return rgb_to_hex(r, g, b)
 
 # ── qs_colors.json ────────────────────────────────────────────────────────────
-qs_path = os.path.expanduser('~/.cache/matugen/qs_colors.json')
+qs_path = '/tmp/qs_colors.json'
 try:
     with open(qs_path) as f:
         colors = json.load(f)

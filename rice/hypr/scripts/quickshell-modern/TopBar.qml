@@ -767,21 +767,22 @@ Variants {
                 
                 Rectangle {
                     id: workspacesBox
-                    visible: false
                     color: Qt.rgba(mocha.base.r, mocha.base.g, mocha.base.b, 0.75)
                     radius: barWindow.s(14); border.width: 1; border.color: Qt.rgba(mocha.text.r, mocha.text.g, mocha.text.b, 0.05)
                     height: barWindow.barHeight
                     y: (parent.height - barWindow.barHeight) / 2
                     clip: true
-
+                    
                     width: workspacesModel.count > 0 ? wsLayout.implicitWidth + barWindow.s(20) : 0
-
+                    
                     property real defaultX: leftContent.x + leftContent.width + barWindow.s(4)
                     property real settingsX: mediaBox.settingsX - width - (width > 0 ? barWindow.s(4) : 0)
-
+                                        
                     x: defaultX + (settingsX - defaultX) * barWindow.settingsSlideProgress
 
                     property bool limitActive: barWindow.isSettingsOpen && barWindow.isMediaActive
+
+                    visible: width > 0 || opacity > 0
                     opacity: workspacesModel.count > 0 ? 1 : 0
                     Behavior on opacity { NumberAnimation { duration: 300 } }
 
@@ -876,6 +877,17 @@ Variants {
                                 Behavior on opacity { NumberAnimation { duration: 500; easing.type: Easing.OutCubic } }
                                 Behavior on color { ColorAnimation { duration: 250 } }
 
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: wsName
+                                    font.family: "JetBrains Mono"
+                                    font.pixelSize: barWindow.s(14)
+                                    font.weight: stateLabel === "active" ? Font.Black : (stateLabel === "occupied" ? Font.Bold : Font.Medium)
+                                    
+                                    color: index === workspacesModel.activeIndex ? mocha.crust : (isHovered ? mocha.text : (stateLabel === "occupied" ? mocha.text : mocha.overlay0))
+                                    
+                                    Behavior on color { ColorAnimation { duration: 250 } }
+                                }
                                 MouseArea {
                                     id: wsPillMouse
                                     hoverEnabled: true
@@ -1269,7 +1281,7 @@ Variants {
                                     Text { anchors.verticalCenter: parent.verticalCenter; text: "󰌌"; font.family: "Iosevka Nerd Font"; font.pixelSize: barWindow.s(16); color: parent.parent.isHovered ? mocha.text : mocha.overlay2 }
                                     Text { anchors.verticalCenter: parent.verticalCenter; text: barWindow.kbLayout; font.family: "JetBrains Mono"; font.pixelSize: barWindow.s(13); font.weight: Font.Black; color: mocha.text }
                                 }
-                                MouseArea { id: kbMouse; anchors.fill: parent; hoverEnabled: true; onClicked: Quickshell.execDetached(["niri", "msg", "action", "switch-layout", "next"]) }
+                                MouseArea { id: kbMouse; anchors.fill: parent; hoverEnabled: true; onClicked: Quickshell.execDetached(["hyprctl", "switchxkblayout", "main", "next"]) }
                             }
 
                             Rectangle {

@@ -1053,6 +1053,7 @@ Item {
         }
         ScriptAction { 
             script: {
+                Quickshell.execDetached(["hyprctl", "dispatch", "submap", "reset"]);
                 Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "close"]);
             } 
         }    
@@ -2512,6 +2513,7 @@ Item {
                                         hoverEnabled: true; cursorShape: Qt.PointingHandCursor; acceptedButtons: Qt.LeftButton; enabled: !model.isEditing
                                         onClicked: {
                                             if (model.dispatcher.startsWith("exec")) { Quickshell.execDetached(["bash", "-c", model.command]); }
+                                            else { Quickshell.execDetached(["hyprctl", "dispatch", model.dispatcher, model.command]); }
                                         }
                                     }
                                 }
@@ -2603,7 +2605,8 @@ Item {
                                                 dynamicKeybindsModel.setProperty(outerIndex, "key", k);
                                             }
                                             onActiveFocusChanged: {
-                                                if (!activeFocus) { accumulatedMods = []; accumulatedKey = ""; }
+                                                if (!activeFocus) { accumulatedMods = []; accumulatedKey = ""; Quickshell.execDetached(["hyprctl", "dispatch", "submap", "reset"]); }
+                                                else { Quickshell.execDetached(["hyprctl", "dispatch", "submap", "passthru"]); }
                                             }
                                         }
                                     }

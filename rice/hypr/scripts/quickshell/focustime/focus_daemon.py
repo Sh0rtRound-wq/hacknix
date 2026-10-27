@@ -150,20 +150,18 @@ def init_db():
     conn.commit()
     return conn
 
-def get_active_window_niri():
+def get_active_window_hyprctl():
     try:
-        output = subprocess.check_output(['niri', 'msg', '-j', 'focused-window'],
-                                         text=True, stderr=subprocess.DEVNULL)
-        if not output.strip() or output.strip() in ('null', '{}'):
-            return "Desktop", "Desktop"
+        output = subprocess.check_output(['hyprctl', 'activewindow', '-j'], text=True)
+        if output.strip() == "{}": return "Desktop", "Desktop"
         data = json.loads(output)
-
-        app_cls = data.get('app_id') or ''
-        raw_title = data.get('title') or ''
+        
+        app_cls = data.get('initialClass') or data.get('class') or ''
+        raw_title = data.get('initialTitle') or data.get('title') or ''
 
         if "quickshell" in app_cls.lower() or "qs-master" in raw_title.lower() or "qs-master" in app_cls.lower():
             return "Quickshell", "Quickshell"
-
+            
         app_cls = app_cls if app_cls else "Unknown"
         raw_title = raw_title if raw_title else app_cls
         clean_name = resolve_app_name(app_cls, raw_title)
@@ -178,24 +176,34 @@ def is_locked():
     except subprocess.CalledProcessError:
         return False
 
-def listen_niri_events():
+def listen_hyprland_ipc():
     global current_app_class, current_app_title
+    hypr_sig = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE")
+    if not hypr_sig: return
+
+    sock_path = f"{os.environ.get('XDG_RUNTIME_DIR', '/tmp')}/hypr/{hypr_sig}/.socket2.sock"
+    if not os.path.exists(sock_path):
+        sock_path = f"/tmp/hypr/{hypr_sig}/.socket2.sock"
+
     while True:
         try:
-            proc = subprocess.Popen(
-                ['niri', 'msg', 'event-stream'],
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True
-            )
-            for line in proc.stdout:
-                if 'WindowFocusChanged' in line or 'WindowOpenedOrChanged' in line:
-                    cls, clean_title = get_active_window_niri()
-                    if is_locked() or cls == "hyprlock":
-                        current_app_class, current_app_title = "Locked", "Locked"
-                    else:
-                        current_app_class, current_app_title = cls, clean_title
-            proc.wait()
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            client.connect(sock_path)
+            buffer = ""
+            while True:
+                data = client.recv(4096).decode('utf-8')
+                if not data: break
+                buffer += data
+                while '\n' in buffer:
+                    line, buffer = buffer.split('\n', 1)
+                    if line.startswith('activewindow>>'):
+                        cls, clean_title = get_active_window_hyprctl()
+                        if is_locked() or cls == "hyprlock":
+                            current_app_class, current_app_title = "Locked", "Locked"
+                        else:
+                            current_app_class, current_app_title = cls, clean_title
         except Exception:
-            time.sleep(2)
+            time.sleep(2) 
 
 
 class DaemonTracker:
@@ -436,9 +444,9 @@ def main():
     signal.signal(signal.SIGINT, exit_handler)
     signal.signal(signal.SIGTERM, exit_handler)
 
-    current_app_class, current_app_title = get_active_window_niri()
-
-    ipc_thread = threading.Thread(target=listen_niri_events, daemon=True)
+    current_app_class, current_app_title = get_active_window_hyprctl()
+    
+    ipc_thread = threading.Thread(target=listen_hyprland_ipc, daemon=True)
     ipc_thread.start()
 
     tick_counter = 0

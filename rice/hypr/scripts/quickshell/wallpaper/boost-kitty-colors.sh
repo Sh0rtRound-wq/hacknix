@@ -4,7 +4,7 @@
 # that keeps them vivid without washing out to white. White/text roles are left
 # at their natural lightness. Pure awk — no Python or extra deps needed.
 
-KITTY_COLORS_FILE="$HOME/.cache/matugen/kitty-matugen-colors.conf"
+KITTY_COLORS_FILE="/tmp/kitty-matugen-colors.conf"
 
 [[ -f "$KITTY_COLORS_FILE" ]] || exit 0
 
