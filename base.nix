@@ -110,6 +110,7 @@ in
   services.xserver.xkb = { layout = "us"; variant = ""; };
   environment.etc."xdg/kitty/kitty.conf".text = ''
     confirm_os_window_close 0
+    remember_window_size no
     cursor_trail 100
     cursor_trail_decay 0.15 0.75
     cursor_trail_start_threshold 1

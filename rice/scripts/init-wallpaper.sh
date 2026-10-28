@@ -32,3 +32,7 @@ $SWWW img --transition-type none "$WALLPAPER"
 
 # Generate color theme from wallpaper
 $MATUGEN image --type scheme-vibrant --contrast 1.0 --source-color-index 0 "$WALLPAPER"
+
+# Post-process: deepen accent colors + reload Hyprland borders + boost kitty colors
+# Same pipeline that wall-change.sh runs — ensures deepened colors survive reboots
+bash "$HOME/.config/hypr/scripts/quickshell/wallpaper/matugen_reload.sh"
