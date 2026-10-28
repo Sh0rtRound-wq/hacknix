@@ -46,8 +46,8 @@ in
   # ── Kernel optimizations ──────────────────────────────────────────────
   boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.kernelModules          = [ "tcp_bbr" ];
-  boot.extraModulePackages    = [ config.boot.kernelPackages.r8168 ];
-  boot.blacklistedKernelModules = [ "r8169" ];
+  boot.extraModulePackages    = [ ];
+  boot.blacklistedKernelModules = [ ];
   boot.kernel.sysctl  = {
     "net.ipv4.tcp_congestion_control" = "bbr";
     "net.core.default_qdisc"          = "fq";
@@ -273,9 +273,7 @@ protontricks
 jdk17
 jdk21
 virtualbox
-davinci-resolve
 kdePackages.kate
-oterm
 onlyoffice-desktopeditors
 syncthing
 strawberry
