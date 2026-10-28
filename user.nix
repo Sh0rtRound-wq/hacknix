@@ -343,6 +343,7 @@ in
   };
   wayland.windowManager.hyprland = {
     enable        = true;
+    configType    = "hyprlang";  # explicit: full Lua migration is a future task
     package       = null;
     portalPackage = null;
     xwayland.enable = true;
