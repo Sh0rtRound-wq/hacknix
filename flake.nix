@@ -2,7 +2,7 @@
   description = "sh0rtround system";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/4bd9165a9165";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     home-manager = {
       url = "github:nix-community/home-manager/master";

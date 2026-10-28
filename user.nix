@@ -94,6 +94,7 @@ in
   home.pointerCursor =
     let
       getFrom = url: hash: name: {
+        enable = true;
         gtk.enable = true;
         x11.enable = true;
         name = name;

@@ -20,7 +20,6 @@ in
   ] ++ lib.optionals isNvidia [ "nvidia-drm.fbdev=1" ]
     ++ lib.optionals isAmdCpu [ "amd_pstate=active" ];
   boot.consoleLogLevel = 0;
-  boot.initrd.verbose  = false;
 
   # ── Plymouth boot splash ───────────────────────────────────────────────
   # No display manager — plymouth-quit-wait would block 60s waiting for
@@ -161,6 +160,7 @@ in
   };
   programs.firefox.enable = true;
   nixpkgs.config.allowUnfree             = true;
+  nixpkgs.config.allowBroken             = true;
   nixpkgs.config.allowInsecurePredicate = _: true;
   nixpkgs.overlays = [
     (final: _: { nur = import nur { nurpkgs = final; pkgs = final; }; })
