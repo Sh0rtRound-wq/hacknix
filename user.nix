@@ -347,7 +347,7 @@ in
     package       = null;
     portalPackage = null;
     xwayland.enable = true;
-    systemd.enable  = true;
+    systemd.enable  = false;  # uwsm manages the session; HM integration stops graphical-session.target and kills uwsm
     extraConfig = ''
       source = ~/.config/hypr/colors.conf
 
@@ -427,7 +427,7 @@ in
   systemd.user.services.quickshell = {
     Unit = {
       Description = "Quickshell compositor shell";
-      After       = [ "hyprland-session.target" ];
+      After       = [ "graphical-session.target" ];
       PartOf      = [ "graphical-session.target" ];
     };
     Service = {
@@ -438,7 +438,7 @@ in
       RestartSec  = "1";
     };
     Install = {
-      WantedBy = [ "hyprland-session.target" ];
+      WantedBy = [ "graphical-session.target" ];
     };
   };
 
