@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # Deepen accent colors post-matugen
+# Reads colors_raw.conf (fresh matugen output) → writes colors.conf (deepened, idempotent)
 python3 "${HOME}/.config/hypr/scripts/deepen-colors.py"
 
 # Apply border colors directly via hyprctl keyword — no reload needed, no race condition
@@ -10,19 +11,15 @@ _inactive=$(grep -oP '(?<=^\$inactive_border = )rgba\([^)]+\)' "${HOME}/.config/
 [ -n "$_active"   ] && hyprctl keyword general:col.active_border   "$_active"   2>/dev/null || true
 [ -n "$_inactive" ] && hyprctl keyword general:col.inactive_border "$_inactive" 2>/dev/null || true
 
-
 # Boost terminal colors to neon/vivid variants (kitty only)
 bash "${HOME}/.config/hypr/scripts/quickshell/wallpaper/boost-kitty-colors.sh"
 
 # Reload Kitty instances
-killall -USR1 .kitty-wrapped
-
+killall -USR1 .kitty-wrapped 2>/dev/null || true
 
 # Reload CAVA
 if pgrep -x "cava" > /dev/null; then
-    # Rebuild the final config file from the base and newly generated colors
     cat ~/.config/cava/config_base ~/.config/cava/colors > ~/.config/cava/config 2>/dev/null
-    # Tell CAVA to reload the config
     killall -USR1 cava
 fi
 
@@ -32,24 +29,15 @@ if command -v swaync-client &> /dev/null; then
 fi
 
 # Restarting swayosd.service is currently the ONLY way to reload its CSS.
-# WARNING: This is what causes the sound problems. Because swayosd-server 
-# forcefully reconnects to an audio server on boot, restarting it causes audio drops/pops.
 if systemctl --user is-active --quiet swayosd.service; then
     systemctl --user restart swayosd.service &
 fi
 
-# ==============================================================================
 # GTK Live-Reload Hack
-# Rapidly toggles the global theme to force GTK3 and GTK4 apps to flush 
-# their caches and read the newly generated Matugen CSS.
-# ==============================================================================
 if command -v gsettings &> /dev/null; then
-    # GTK3 apps
     gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita'
     sleep 0.05
     gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark'
-    
-    # GTK4 / Libadwaita apps
     gsettings set org.gnome.desktop.interface color-scheme 'default'
     sleep 0.05
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
