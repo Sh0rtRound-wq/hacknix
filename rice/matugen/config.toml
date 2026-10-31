@@ -3,7 +3,10 @@ reload_apps = false
 
 [templates.quickshell]
 input_path  = "~/.config/matugen/templates/qs_colors.json.template"
-output_path = "/tmp/qs_colors.json"
+# Raw output. deepen-colors.py applies the neon transform and writes the
+# /tmp/qs_colors.json that quickshell actually reads. Separate files so the
+# transform never reads its own output.
+output_path = "/tmp/qs_colors_raw.json"
 
 [templates.kitty]
 input_path  = "~/.config/matugen/templates/kitty-colors.conf.template"
@@ -47,4 +50,8 @@ output_path = "~/.config/qt6ct/qss/matugen-style.qss"
 
 [templates.hyprland]
 input_path  = "~/.config/matugen/templates/hyprland.conf.template"
-output_path = "~/.config/hypr/colors.conf"
+# Raw output. deepen-colors.py applies the neon transform (S->100%, L->0.50-
+# 0.65) and writes colors.conf, which is what hyprland.conf sources. Matugen
+# must NOT write colors.conf directly: primary_container is S100% but only
+# L44%, which reads as a dark colour rather than neon.
+output_path = "~/.config/hypr/colors_raw.conf"

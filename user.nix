@@ -6,6 +6,80 @@ let
     cat ~/.config/cava/config_base ~/.config/cava/colors > ~/.config/cava/config 2>/dev/null
     exec ${pkgs.cava}/bin/cava "$@"
   '';
+
+  # ── Border colour: push colors.conf into the running compositor ────────
+  # matugen is the SOLE writer of colors.conf, and its template pulls
+  # primary_container, which Material You already supplies at S100% L44%.
+  # There is deliberately no transform step here.
+  #
+  # History: colors.conf used to be post-processed by deepen-colors.py, which
+  # read and wrote the same file. That gave two permanent failure states —
+  # a failed run left the raw washed-out value in place (grey border on every
+  # subsequent boot, never self-recovering), and a repeat run double-deepened.
+  # It also *desaturated* (100% -> 52%), which was the grey itself.
+  #
+  # All binaries are absolute nix store paths; the old script called bare
+  # `python3`/`grep`/`hyprctl` and silently no-op'd whenever the Hyprland
+  # exec-once environment lacked them.
+  apply-border-colors = pkgs.writeShellScript "apply-border-colors" ''
+    set -uo pipefail
+
+    RAW="$HOME/.config/hypr/colors_raw.conf"
+    OUT="$HOME/.config/hypr/colors.conf"
+    QS_RAW="/tmp/qs_colors_raw.json"
+
+    # The quickshell accents live in /tmp and are ONLY ever produced by
+    # matugen, so if init-wallpaper died (bad wallpaper path, matugen crash)
+    # or /tmp was cleaned, quickshell would fall back to its hardcoded
+    # catppuccin defaults. Regenerate the raw files ourselves so this unit is
+    # fully self-sufficient and does not depend on init-wallpaper at all.
+    # The border itself is safe regardless: colors.conf is under ~/.config and
+    # persists across reboots.
+    if [ ! -f "$RAW" ] || [ ! -f "$QS_RAW" ]; then
+      _wall=$(${pkgs.coreutils}/bin/cat "$HOME/.config/hypr/wallpaper" 2>/dev/null || true)
+      if [ -n "$_wall" ] && [ -f "$_wall" ]; then
+        ${pkgs.matugen}/bin/matugen image --type scheme-vibrant --contrast 1.0 \
+          --source-color-index 0 "$_wall" >/dev/null 2>&1 || \
+          echo "apply-border-colors: matugen failed on $_wall" >&2
+      else
+        echo "apply-border-colors: no usable wallpaper at $_wall" >&2
+      fi
+    fi
+
+    # Apply the neon transform (S->100%, L->0.50-0.65). matugen's raw output is
+    # washed (L84%) and even primary_container is only L44%. Reads the _raw
+    # files, writes the files consumers read, so repeat runs are idempotent and
+    # a failure leaves the last-good output in place.
+    ${pkgs.python3}/bin/python3 "$HOME/.config/hypr/scripts/deepen-colors.py" || \
+      echo "apply-border-colors: transform failed, keeping existing colors.conf" >&2
+
+    [ -f "$OUT" ] || exit 0
+
+    # colors.conf is only read by Hyprland at startup/reload, so a live
+    # session needs an explicit set. `keyword` rather than `reload` to avoid
+    # racing settings_watcher.sh. Worst case this fails and the next boot
+    # still reads the correct colors.conf — no persistent bad state.
+    _active=$(${pkgs.gnugrep}/bin/grep -oP   '(?<=^\$active_border = )rgba\([^)]+\)'   "$OUT" || true)
+    _inactive=$(${pkgs.gnugrep}/bin/grep -oP '(?<=^\$inactive_border = )rgba\([^)]+\)' "$OUT" || true)
+
+    # Resolve the live instance ourselves — exec-once and systemd user units
+    # do not always inherit HYPRLAND_INSTANCE_SIGNATURE.
+    _sockdir="''${XDG_RUNTIME_DIR:-/run/user/$(${pkgs.coreutils}/bin/id -u)}/hypr"
+    _try() {
+      [ -n "$2" ] || return 0
+      if [ -n "''${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+        hyprctl keyword "$1" "$2" >/dev/null 2>&1 && return 0
+      fi
+      for _d in "$_sockdir"/*/; do
+        [ -S "$_d/.socket.sock" ] || continue
+        HYPRLAND_INSTANCE_SIGNATURE="$(${pkgs.coreutils}/bin/basename "$_d")" \
+          hyprctl keyword "$1" "$2" >/dev/null 2>&1 && return 0
+      done
+      return 0
+    }
+    _try general:col.active_border   "$_active"
+    _try general:col.inactive_border "$_inactive"
+  '';
 in
 {
   home.username      = homeUser;
@@ -442,13 +516,60 @@ in
     };
   };
 
+  # ── Border colour: self-heal at session start ─────────────────────────
+  # Runs independently of init-wallpaper. If that script dies (bad wallpaper
+  # path, matugen failure, missing PATH entry) the border still gets the
+  # deepened colour instead of silently falling back to raw/default grey.
+  systemd.user.services.border-colors = {
+    Unit = {
+      Description = "Apply deepened matugen border colours to Hyprland";
+      After       = [ "graphical-session.target" ];
+      PartOf      = [ "graphical-session.target" ];
+    };
+    Service = {
+      Type      = "oneshot";
+      ExecStart = "${apply-border-colors}";
+      # Hyprland's IPC socket may not exist the instant the target is up.
+      ExecStartPre = "${pkgs.coreutils}/bin/sleep 2";
+    };
+    Install = {
+      WantedBy = [ "graphical-session.target" ];
+    };
+  };
+
+  # Re-apply whenever matugen rewrites colors.conf (wallpaper change).
+  # Decouples applying the colour from whichever script invoked matugen.
+  systemd.user.paths.border-colors = {
+    Unit = {
+      Description = "Watch matugen raw colours for changes";
+      PartOf      = [ "graphical-session.target" ];
+    };
+    Path = {
+      PathChanged = "%h/.config/hypr/colors_raw.conf";
+      Unit        = "border-colors.service";
+    };
+    Install = {
+      WantedBy = [ "graphical-session.target" ];
+    };
+  };
+
   # ── Wallpapers + Scripts ───────────────────────────────────────────────
   home.activation.setupRice = lib.hm.dag.entryAfter ["linkGeneration"] ''
     mkdir -p "$HOME/.config/hypr/config"
 
+    # colors.conf is owned by matugen. Seed it only so Hyprland has something
+    # to source before matugen has ever run. inactive_border matches the
+    # matugen template (rgba(00000000)); the old rgba(33333388) seed rendered
+    # as a literal grey border whenever this fallback was hit.
     if [ ! -f "$HOME/.config/hypr/colors.conf" ]; then
-      echo '$active_border = rgba(00FF41ee)' > "$HOME/.config/hypr/colors.conf"
-      echo '$inactive_border = rgba(33333388)' >> "$HOME/.config/hypr/colors.conf"
+      echo '$active_border = rgba(00FF41ee)'   > "$HOME/.config/hypr/colors.conf"
+      echo '$inactive_border = rgba(00000000)' >> "$HOME/.config/hypr/colors.conf"
+    fi
+
+    # Seed raw too, so the transform has an input on a brand-new install.
+    if [ ! -f "$HOME/.config/hypr/colors_raw.conf" ]; then
+      echo '$active_border = rgba(00FF41ee)'   > "$HOME/.config/hypr/colors_raw.conf"
+      echo '$inactive_border = rgba(00000000)' >> "$HOME/.config/hypr/colors_raw.conf"
     fi
 
     chmod -R +x "$HOME/.config/hypr/scripts/" 2>/dev/null || true

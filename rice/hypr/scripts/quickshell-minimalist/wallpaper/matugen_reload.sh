@@ -1,32 +1,22 @@
 #!/usr/bin/env bash
 
-# Deepen accent colors post-matugen
-python3 "${HOME}/.config/hypr/scripts/deepen-colors.py"
-
-# Reload Hyprland borders — use env vars if set, otherwise find the socket manually
-# Run synchronously so we know it completed before continuing
-_uid=$(id -u)
-_xrd="${XDG_RUNTIME_DIR:-/run/user/${_uid}}"
-if [ -z "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
-    _sig=$(ls "${_xrd}/hypr/" 2>/dev/null | head -1)
-    [ -n "$_sig" ] && XDG_RUNTIME_DIR="$_xrd" HYPRLAND_INSTANCE_SIGNATURE="$_sig" hyprctl reload 2>/dev/null || true
-else
-    hyprctl reload 2>/dev/null || true
-fi
-
+# Deepen colours + push them into the running compositor.
+# Delegated to the border-colors unit so the logic lives in exactly one place
+# and runs with absolute binary paths rather than whatever PATH exec-once
+# happened to inherit. The systemd path unit on colors_raw.conf also fires
+# this on its own, so this call is belt-and-braces.
+systemctl --user start --no-block border-colors.service 2>/dev/null || \
+  python3 "${HOME}/.config/hypr/scripts/deepen-colors.py" || true
 
 # Boost terminal colors to neon/vivid variants (kitty only)
-bash "${HOME}/.config/hypr/scripts/quickshell/wallpaper/boost-kitty-colors.sh"
+bash "${HOME}/.config/hypr/scripts/quickshell-minimalist/wallpaper/boost-kitty-colors.sh"
 
 # Reload Kitty instances
-killall -USR1 .kitty-wrapped
-
+killall -USR1 .kitty-wrapped 2>/dev/null || true
 
 # Reload CAVA
 if pgrep -x "cava" > /dev/null; then
-    # Rebuild the final config file from the base and newly generated colors
     cat ~/.config/cava/config_base ~/.config/cava/colors > ~/.config/cava/config 2>/dev/null
-    # Tell CAVA to reload the config
     killall -USR1 cava
 fi
 
@@ -36,24 +26,15 @@ if command -v swaync-client &> /dev/null; then
 fi
 
 # Restarting swayosd.service is currently the ONLY way to reload its CSS.
-# WARNING: This is what causes the sound problems. Because swayosd-server 
-# forcefully reconnects to an audio server on boot, restarting it causes audio drops/pops.
 if systemctl --user is-active --quiet swayosd.service; then
     systemctl --user restart swayosd.service &
 fi
 
-# ==============================================================================
 # GTK Live-Reload Hack
-# Rapidly toggles the global theme to force GTK3 and GTK4 apps to flush 
-# their caches and read the newly generated Matugen CSS.
-# ==============================================================================
 if command -v gsettings &> /dev/null; then
-    # GTK3 apps
     gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita'
     sleep 0.05
     gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark'
-    
-    # GTK4 / Libadwaita apps
     gsettings set org.gnome.desktop.interface color-scheme 'default'
     sleep 0.05
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'

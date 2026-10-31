@@ -11,8 +11,9 @@
   "overlay0": "{{colors.inverse_surface.default.hex}}",
   "overlay1": "{{colors.inverse_surface.default.hex}}",
   "overlay2": "{{colors.inverse_surface.default.hex}}",
-  "blue":     "{{colors.primary.default.hex}}",
-  "sapphire": "{{colors.primary_container.default.hex}}",
+
+  "blue":     "{{colors.primary_container.default.hex}}",
+  "sapphire": "{{colors.primary_fixed_dim.default.hex}}",
   "peach":    "{{colors.tertiary.default.hex}}",
   "green":    "{{colors.secondary.default.hex}}",
   "red":      "{{colors.error.default.hex}}",
@@ -20,5 +21,5 @@
   "pink":     "{{colors.tertiary_container.default.hex}}",
   "yellow":   "{{colors.secondary_container.default.hex}}",
   "maroon":   "{{colors.error_container.default.hex}}",
-  "teal":     "{{colors.secondary.default.hex}}"
+  "teal":     "{{colors.tertiary_fixed_dim.default.hex}}"
 }
