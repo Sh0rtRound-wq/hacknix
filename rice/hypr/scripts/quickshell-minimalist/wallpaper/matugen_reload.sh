@@ -4,8 +4,9 @@
 python3 "${HOME}/.config/hypr/scripts/deepen-colors.py"
 
 # Apply border colors directly via hyprctl keyword — no reload needed, no race condition
-_active=$(grep 'active_border'   "${HOME}/.config/hypr/colors.conf" | grep -oP 'rgba\([^)]+\)')
-_inactive=$(grep 'inactive_border' "${HOME}/.config/hypr/colors.conf" | grep -oP 'rgba\([^)]+\)')
+# Anchor to ^ so inactive_border line doesn't pollute _active match
+_active=$(grep -oP   '(?<=^\$active_border = )rgba\([^)]+\)'   "${HOME}/.config/hypr/colors.conf")
+_inactive=$(grep -oP '(?<=^\$inactive_border = )rgba\([^)]+\)' "${HOME}/.config/hypr/colors.conf")
 [ -n "$_active"   ] && hyprctl keyword general:col.active_border   "$_active"   2>/dev/null || true
 [ -n "$_inactive" ] && hyprctl keyword general:col.inactive_border "$_inactive" 2>/dev/null || true
 
