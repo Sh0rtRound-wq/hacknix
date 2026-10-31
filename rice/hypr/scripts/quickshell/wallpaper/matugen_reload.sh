@@ -3,16 +3,11 @@
 # Deepen accent colors post-matugen
 python3 "${HOME}/.config/hypr/scripts/deepen-colors.py"
 
-# Reload Hyprland borders — use env vars if set, otherwise find the socket manually
-# Run synchronously so we know it completed before continuing
-_uid=$(id -u)
-_xrd="${XDG_RUNTIME_DIR:-/run/user/${_uid}}"
-if [ -z "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
-    _sig=$(ls "${_xrd}/hypr/" 2>/dev/null | head -1)
-    [ -n "$_sig" ] && XDG_RUNTIME_DIR="$_xrd" HYPRLAND_INSTANCE_SIGNATURE="$_sig" hyprctl reload 2>/dev/null || true
-else
-    hyprctl reload 2>/dev/null || true
-fi
+# Apply border colors directly via hyprctl keyword — no reload needed, no race condition
+_active=$(grep 'active_border'   "${HOME}/.config/hypr/colors.conf" | grep -oP 'rgba\([^)]+\)')
+_inactive=$(grep 'inactive_border' "${HOME}/.config/hypr/colors.conf" | grep -oP 'rgba\([^)]+\)')
+[ -n "$_active"   ] && hyprctl keyword general:col.active_border   "$_active"   2>/dev/null || true
+[ -n "$_inactive" ] && hyprctl keyword general:col.inactive_border "$_inactive" 2>/dev/null || true
 
 
 # Boost terminal colors to neon/vivid variants (kitty only)
