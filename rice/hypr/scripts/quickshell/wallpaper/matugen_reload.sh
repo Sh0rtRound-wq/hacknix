@@ -2,9 +2,17 @@
 
 # Deepen accent colors post-matugen
 python3 "${HOME}/.config/hypr/scripts/deepen-colors.py"
-# Reload Hyprland borders
-sig=$(ls /run/user/1000/hypr/ 2>/dev/null | head -1)
-[ -n "$sig" ] && XDG_RUNTIME_DIR=/run/user/1000 HYPRLAND_INSTANCE_SIGNATURE="$sig" hyprctl reload &
+
+# Reload Hyprland borders — use env vars if set, otherwise find the socket manually
+# Run synchronously so we know it completed before continuing
+_uid=$(id -u)
+_xrd="${XDG_RUNTIME_DIR:-/run/user/${_uid}}"
+if [ -z "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+    _sig=$(ls "${_xrd}/hypr/" 2>/dev/null | head -1)
+    [ -n "$_sig" ] && XDG_RUNTIME_DIR="$_xrd" HYPRLAND_INSTANCE_SIGNATURE="$_sig" hyprctl reload 2>/dev/null || true
+else
+    hyprctl reload 2>/dev/null || true
+fi
 
 
 # Boost terminal colors to neon/vivid variants (kitty only)

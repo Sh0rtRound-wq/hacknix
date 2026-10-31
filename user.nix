@@ -507,8 +507,8 @@ PYEOF
       chmod +x "$HOME/.local/bin/$name"
     done
 
-    # Write QS theme file — load_info.sh handles live switching
+    # Write QS theme file — only on first install; runtime switches via qs-theme.sh persist
     mkdir -p "$HOME/.config/hypr"
-    echo "${qsTheme}" > "$HOME/.config/hypr/.qs_theme"
+    [ ! -f "$HOME/.config/hypr/.qs_theme" ] && echo "${qsTheme}" > "$HOME/.config/hypr/.qs_theme"
   '';
 }
