@@ -44,9 +44,14 @@ except Exception as e:
     print(f"qs_colors error: {e}", file=sys.stderr)
 
 # ── colors.conf (Hyprland border) ────────────────────────────────────────────
+# Read from colors_raw.conf (fresh matugen output) → write to colors.conf (deepened)
+# This keeps deepen idempotent: always processes raw values, never re-deepens
+raw_path  = os.path.expanduser('~/.config/hypr/colors_raw.conf')
 conf_path = os.path.expanduser('~/.config/hypr/colors.conf')
+# Fall back to reading colors.conf if raw doesn't exist yet (legacy compat)
+src_path = raw_path if os.path.exists(raw_path) else conf_path
 try:
-    with open(conf_path) as f:
+    with open(src_path) as f:
         content = f.read()
 
     def replace_hex(m):

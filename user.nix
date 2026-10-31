@@ -446,6 +446,12 @@ in
   home.activation.setupRice = lib.hm.dag.entryAfter ["linkGeneration"] ''
     mkdir -p "$HOME/.config/hypr/config"
 
+    # colors_raw.conf = fresh matugen output; colors.conf = deepened by deepen-colors.py
+    # Both must exist before first matugen run so Hyprland has something to source
+    if [ ! -f "$HOME/.config/hypr/colors_raw.conf" ]; then
+      echo '$active_border = rgba(00FF41ee)' > "$HOME/.config/hypr/colors_raw.conf"
+      echo '$inactive_border = rgba(33333388)' >> "$HOME/.config/hypr/colors_raw.conf"
+    fi
     if [ ! -f "$HOME/.config/hypr/colors.conf" ]; then
       echo '$active_border = rgba(00FF41ee)' > "$HOME/.config/hypr/colors.conf"
       echo '$inactive_border = rgba(33333388)' >> "$HOME/.config/hypr/colors.conf"
