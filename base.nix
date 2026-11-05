@@ -221,7 +221,7 @@ awww
 quickshell
 cliphist
 thunar
-discord
+vesktop
 matugen
 mpv
 obs-studio
