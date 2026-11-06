@@ -252,7 +252,7 @@ appimage-run
 wine
 ansible
 home-manager
-claude-code
+opencode
 anytype
 xclip
 vlc
