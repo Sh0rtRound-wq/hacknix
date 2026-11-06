@@ -212,7 +212,6 @@ swayosd
 libnotify
 networkmanagerapplet
 waybar
-rofi
 swaynotificationcenter
 hyprlock
 hyprpolkitagent
