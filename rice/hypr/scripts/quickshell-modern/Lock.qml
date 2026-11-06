@@ -373,6 +373,18 @@ ShellRoot {
                                 color: root.text
                                 Behavior on color { ColorAnimation { duration: 300 } }
                             }
+                            Text {
+                                id: clockAmPm
+                                font.family: "JetBrains Mono"
+                                font.pixelSize: 36 * screenRoot.sc
+                                font.weight: Font.Bold
+                                color: root.text
+                                opacity: 0.6
+                                Layout.alignment: Qt.AlignBottom
+                                Layout.bottomMargin: 26 * screenRoot.sc
+                                Layout.leftMargin: 12 * screenRoot.sc
+                                Behavior on color { ColorAnimation { duration: 300 } }
+                            }
                         }
 
                         Text {
@@ -388,8 +400,9 @@ ShellRoot {
                             interval: 1000; running: true; repeat: true; triggeredOnStart: true
                             onTriggered: {
                                 let d = new Date();
-                                clockHours.text = Qt.formatDateTime(d, "hh");
+                                clockHours.text = Qt.formatDateTime(d, "h AP").split(" ")[0];
                                 clockMinutes.text = Qt.formatDateTime(d, "mm");
+                                clockAmPm.text = Qt.formatDateTime(d, "AP");
                                 dateText.text = Qt.formatDateTime(d, "dddd, MMMM dd");
                             }
                         }
