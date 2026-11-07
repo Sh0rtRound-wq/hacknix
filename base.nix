@@ -253,7 +253,6 @@ wine
 ansible
 home-manager
 opencode
-anytype
 xclip
 vlc
 ntp
