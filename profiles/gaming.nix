@@ -13,6 +13,7 @@ guitarix
 qpwgraph
 bolt-launcher
 plex-desktop
+deadlock-mod-manager
 ];
 
 # nixadd
