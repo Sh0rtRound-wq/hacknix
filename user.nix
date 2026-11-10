@@ -165,24 +165,14 @@ in
     swayosd
   ];
 
-  home.pointerCursor =
-    let
-      getFrom = url: hash: name: {
-        enable = true;
-        gtk.enable = true;
-        x11.enable = true;
-        name = name;
-        size = 24;
-        package = pkgs.runCommand "moveUp" {} ''
-          mkdir -p $out/share/icons
-          ln -s ${pkgs.fetchzip { url = url; hash = hash; }}/dist $out/share/icons/${name}
-        '';
-      };
-    in
-      getFrom
-        "https://github.com/yeyushengfan258/ArcMidnight-Cursors/archive/refs/heads/main.zip"
-        "sha256-VgOpt0rukW0+rSkLFoF9O0xO/qgwieAchAev1vjaqPE="
-        "ArcMidnight-Cursors";
+  home.pointerCursor = {
+    enable     = true;
+    gtk.enable = true;
+    x11.enable = true;
+    size       = 24;
+    name       = "oreo_spark_black_bordered_cursors";
+    package    = pkgs.oreo-cursors-plus;
+  };
 
   dconf.settings."org/gnome/desktop/interface" = {
     color-scheme = "prefer-dark";
