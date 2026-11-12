@@ -5,7 +5,7 @@ command="$@"
 command_window_address=$(hyprctl activewindow -j | jq -r '.address')
 
 focus() {
-    hyprctl dispatch focuswindow "address:$command_window_address" > /dev/null
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$command_window_address\" })" > /dev/null
 }
 
 start_time=$(date +%s)

@@ -297,7 +297,13 @@ Variants {
                         let txt = this.text.trim();
                         if (txt !== "") {
                             try { 
-                                let newData = JSON.parse(txt);
+                                let parsed = JSON.parse(txt);
+                                // workspaces.json is keyed by monitor name (per-monitor
+                                // workspace slots); each bar renders its own monitor's
+                                // set. A flat array is still accepted (global mode).
+                                let newData = Array.isArray(parsed)
+                                    ? parsed
+                                    : (parsed[(barWindow.screen && barWindow.screen.name) ? barWindow.screen.name : ""] || []);
                                 
                                 while (workspacesModel.count < newData.length) {
                                     workspacesModel.append({ "wsId": "", "wsState": "" });

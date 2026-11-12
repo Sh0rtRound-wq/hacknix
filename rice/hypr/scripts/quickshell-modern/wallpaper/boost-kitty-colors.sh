@@ -60,6 +60,19 @@ function hls_g(h,l,s,    q,p) { if(s==0)return l; q=(l<0.5)?l*(1+s):l+s-l*s; p=2
 function hls_b(h,l,s,    q,p) { if(s==0)return l; q=(l<0.5)?l*(1+s):l+s-l*s; p=2*l-q; return _hue(p,q,h-1/3) }
 
 function clamp(v,lo,hi) { return (v<lo?lo:(v>hi?hi:v)) }
+
+# Hue anchor (degrees): pull the yellow-green band toward true green so greens
+# read green, not chartreuse. Smooth ramps at both edges; yellows/cyans untouched.
+# Keep in sync with anchor_green() in deepen-colors.py.
+function anchor_green_deg(d,    lo,hi,ramp,pull,target,w) {
+    lo=68; hi=140; ramp=10; pull=0.9; target=124
+    if (d < lo || d >= hi) return d
+    w = (d - lo) / ramp
+    if ((hi - d) / ramp < w) w = (hi - d) / ramp
+    if (w > 1) w = 1
+    if (w <= 0) return d
+    return d + (target - d) * w * pull
+}
 function to_hex(v)       { return sprintf("%02x", int(v*255 + 0.5)) }
 
 function rgb2hex(r,g,b) { return "#" to_hex(r) to_hex(g) to_hex(b) }
@@ -70,7 +83,8 @@ function rgb2hex(r,g,b) { return "#" to_hex(r) to_hex(g) to_hex(b) }
 function boost_accent(hex,    r,g,b,h,l,s) {
     r=hex_r(hex); g=hex_g(hex); b=hex_b(hex)
     h=rgb_h(r,g,b); l=rgb_l(r,g,b); s=rgb_s(r,g,b)
-    l = clamp(l, 0.50, 0.65)   # neon sweet spot — vivid but not washed out
+    h = anchor_green_deg(h * 360) / 360
+    l = clamp(l, 0.48, 0.56)   # deep neon: the UI lightens accents ~1.15x, so a 0.65 value read as washed white-green
     s = clamp(s + 0.35, 0, 1)  # push toward fully saturated
     return rgb2hex(hls_r(h,l,s), hls_g(h,l,s), hls_b(h,l,s))
 }

@@ -33,6 +33,35 @@ Item {
         Quickshell.execDetached(["bash", "-c", cmd]);
     }
 
+    // Build a Lua dispatcher expression from a hyprlang-style dispatcher + arg.
+    function luaDispatcherCall(name, arg) {
+        let a = JSON.stringify(arg === undefined ? "" : arg);
+        switch (name) {
+            case "killactive":      return "hl.dsp.window.close()";
+            case "togglefloating":  return "hl.dsp.window.float({ action = \"toggle\" })";
+            case "fullscreen":      return "hl.dsp.window.fullscreen()";
+            case "centerwindow":    return "hl.dsp.window.center()";
+            case "pseudo":          return "hl.dsp.window.pseudo()";
+            case "pin":             return "hl.dsp.window.pin()";
+            case "movefocus":       return "hl.dsp.focus({ direction = " + a + " })";
+            case "movewindow":      return "hl.dsp.window.move({ direction = " + a + " })";
+            case "workspace":       return "hl.dsp.focus({ workspace = " + a + " })";
+            case "movetoworkspace": return "hl.dsp.window.move({ workspace = " + a + " })";
+            case "submap":          return "hl.dsp.submap(" + a + ")";
+            default:                return "hl.dsp.exec_cmd(" + a + ")";
+        }
+    }
+
+    // Build a Lua hl.monitor({...}) call from a monitor rect object.
+    function luaMonitorCall(r) {
+        let s = 'hl.monitor({ output = ' + JSON.stringify(r.name) +
+                ', mode = ' + JSON.stringify(r.resW + "x" + r.resH + "@" + r.rate) +
+                ', position = ' + JSON.stringify(r.x + "x" + r.y) +
+                ', scale = ' + r.sysScale;
+        if (r.transform !== 0) s += ", transform = " + r.transform;
+        return s + " })";
+    }
+
     // --- JSON Operations ---
     function getSetting(key, fallbackValue) {
         return rawSettings.hasOwnProperty(key) ? rawSettings[key] : fallbackValue;
@@ -227,7 +256,7 @@ Item {
             if (m.transform !== 0) monitorStr += ",transform," + m.transform;
             let jsonArr = [{ name: m.name, resW: m.resW, resH: m.resH, rate: parseInt(m.rate), x: 0, y: 0, scale: m.sysScale, transform: m.transform }];
             config.setSetting("monitors", jsonArr);
-            config.sh("hyprctl keyword monitor " + monitorStr + " ; awww kill ; sleep 0.2 ; awww-daemon &");
+            config.sh("hyprctl eval '" + config.luaMonitorCall({ name: m.name, resW: m.resW, resH: m.resH, rate: m.rate, x: 0, y: 0, sysScale: m.sysScale, transform: m.transform }) + "' ; systemctl --user restart awww-daemon.service ; sleep 0.5 ; awww img --transition-type none \"$(cat \"$HOME/.config/hypr/wallpaper\" 2>/dev/null)\" > /dev/null 2>&1 &");
             Quickshell.execDetached(["notify-send", "Display Update", "Applied: " + m.resW + "x" + m.resH + " @ " + m.rate + "Hz"]);
         } else {
             let rects = [];
@@ -272,12 +301,12 @@ Item {
                 r.y = Math.round(r.y - finalMinY);
                 let monitorStr = r.name + "," + r.resW + "x" + r.resH + "@" + r.rate + "," + r.x + "x" + r.y + "," + r.sysScale;
                 if (r.transform !== 0) monitorStr += ",transform," + r.transform;
-                batchCmds.push("keyword monitor " + monitorStr);
+                batchCmds.push(config.luaMonitorCall(r));
                 summaryString += r.name + " ";
                 jsonArr.push({ name: r.name, resW: r.resW, resH: r.resH, rate: parseInt(r.rate), x: r.x, y: r.y, scale: r.sysScale, transform: r.transform });
             }
             config.setSetting("monitors", jsonArr);
-            config.sh("hyprctl --batch '" + batchCmds.join(" ; ") + "' ; awww kill ; sleep 0.2 ; awww-daemon &");
+            config.sh("hyprctl eval '" + batchCmds.join(" ") + "' ; systemctl --user restart awww-daemon.service ; sleep 0.5 ; awww img --transition-type none \"$(cat \"$HOME/.config/hypr/wallpaper\" 2>/dev/null)\" > /dev/null 2>&1 &");
             Quickshell.execDetached(["notify-send", "Display Update", "Applied layout for: " + summaryString.trim()]);
         }
     }

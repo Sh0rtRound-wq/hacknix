@@ -7,12 +7,12 @@ let
     exec ${pkgs.cava}/bin/cava "$@"
   '';
 
-  # ── Border colour: push colors.conf into the running compositor ────────
-  # matugen is the SOLE writer of colors.conf, and its template pulls
+  # ── Border colour: push colors.lua into the running compositor ────────
+  # matugen is the SOLE writer of colors.lua, and its template pulls
   # primary_container, which Material You already supplies at S100% L44%.
   # There is deliberately no transform step here.
   #
-  # History: colors.conf used to be post-processed by deepen-colors.py, which
+  # History: colors.lua used to be post-processed by deepen-colors.py, which
   # read and wrote the same file. That gave two permanent failure states —
   # a failed run left the raw washed-out value in place (grey border on every
   # subsequent boot, never self-recovering), and a repeat run double-deepened.
@@ -24,8 +24,8 @@ let
   apply-border-colors = pkgs.writeShellScript "apply-border-colors" ''
     set -uo pipefail
 
-    RAW="$HOME/.config/hypr/colors_raw.conf"
-    OUT="$HOME/.config/hypr/colors.conf"
+    RAW="$HOME/.config/hypr/colors_raw.lua"
+    OUT="$HOME/.config/hypr/colors.lua"
     QS_RAW="/tmp/qs_colors_raw.json"
 
     # The quickshell accents live in /tmp and are ONLY ever produced by
@@ -33,12 +33,12 @@ let
     # or /tmp was cleaned, quickshell would fall back to its hardcoded
     # catppuccin defaults. Regenerate the raw files ourselves so this unit is
     # fully self-sufficient and does not depend on init-wallpaper at all.
-    # The border itself is safe regardless: colors.conf is under ~/.config and
+    # The border itself is safe regardless: colors.lua is under ~/.config and
     # persists across reboots.
     if [ ! -f "$RAW" ] || [ ! -f "$QS_RAW" ]; then
       _wall=$(${pkgs.coreutils}/bin/cat "$HOME/.config/hypr/wallpaper" 2>/dev/null || true)
       if [ -n "$_wall" ] && [ -f "$_wall" ]; then
-        ${pkgs.matugen}/bin/matugen image --type scheme-vibrant --contrast 1.0 \
+        ${pkgs.matugen}/bin/matugen image --type scheme-vibrant --contrast 1.0 --mode dark \
           --source-color-index 0 "$_wall" >/dev/null 2>&1 || \
           echo "apply-border-colors: matugen failed on $_wall" >&2
       else
@@ -51,34 +51,37 @@ let
     # files, writes the files consumers read, so repeat runs are idempotent and
     # a failure leaves the last-good output in place.
     ${pkgs.python3}/bin/python3 "$HOME/.config/hypr/scripts/deepen-colors.py" || \
-      echo "apply-border-colors: transform failed, keeping existing colors.conf" >&2
+      echo "apply-border-colors: transform failed, keeping existing colors.lua" >&2
 
     [ -f "$OUT" ] || exit 0
 
-    # colors.conf is only read by Hyprland at startup/reload, so a live
-    # session needs an explicit set. `keyword` rather than `reload` to avoid
-    # racing settings_watcher.sh. Worst case this fails and the next boot
-    # still reads the correct colors.conf — no persistent bad state.
-    _active=$(${pkgs.gnugrep}/bin/grep -oP   '(?<=^\$active_border = )rgba\([^)]+\)'   "$OUT" || true)
-    _inactive=$(${pkgs.gnugrep}/bin/grep -oP '(?<=^\$inactive_border = )rgba\([^)]+\)' "$OUT" || true)
+    # colors.lua is only read by Hyprland at startup/reload, so a live session
+    # needs an explicit set. Under the Lua config provider `hyprctl keyword` is a
+    # no-op (man page), so the values are pushed with `hyprctl eval`. Worst case
+    # this fails and the next boot still reads the correct colors.lua — no
+    # persistent bad state.
+    _active=$(${pkgs.gnugrep}/bin/grep -oP '^\s*active_border\s*=\s*"rgba\([^)]+\)"' "$OUT" | ${pkgs.coreutils}/bin/head -n1 | ${pkgs.gnused}/bin/sed 's/.*"\(.*\)"/\1/' || true)
+    _inactive=$(${pkgs.gnugrep}/bin/grep -oP '^\s*inactive_border\s*=\s*"rgba\([^)]+\)"' "$OUT" | ${pkgs.coreutils}/bin/head -n1 | ${pkgs.gnused}/bin/sed 's/.*"\(.*\)"/\1/' || true)
+
+    [ -n "$_active" ] || exit 0
+
+    _code=$(printf 'hl.config({ general = { col = { active_border = "%%s", inactive_border = "%%s" } } })' "$_active" "$_inactive")
 
     # Resolve the live instance ourselves — exec-once and systemd user units
     # do not always inherit HYPRLAND_INSTANCE_SIGNATURE.
     _sockdir="''${XDG_RUNTIME_DIR:-/run/user/$(${pkgs.coreutils}/bin/id -u)}/hypr"
-    _try() {
-      [ -n "$2" ] || return 0
+    _apply() {
       if [ -n "''${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
-        hyprctl keyword "$1" "$2" >/dev/null 2>&1 && return 0
+        hyprctl eval "$_code" >/dev/null 2>&1 && return 0
       fi
       for _d in "$_sockdir"/*/; do
         [ -S "$_d/.socket.sock" ] || continue
         HYPRLAND_INSTANCE_SIGNATURE="$(${pkgs.coreutils}/bin/basename "$_d")" \
-          hyprctl keyword "$1" "$2" >/dev/null 2>&1 && return 0
+          hyprctl eval "$_code" >/dev/null 2>&1 && return 0
       done
       return 0
     }
-    _try general:col.active_border   "$_active"
-    _try general:col.inactive_border "$_inactive"
+    _apply
   '';
 in
 {
@@ -266,12 +269,12 @@ in
       cpu = {
         format   = "<span foreground='#00FF41'> </span> {usage}%";
         interval = 2;
-        on-click-right = "hyprctl dispatch exec '[float; center; size 950 650] kitty --override font_size=14 --title float_kitty btop'";
+        on-click-right = "hyprctl dispatch 'hl.dsp.exec_cmd(\"kitty --override font_size=14 --title float_kitty btop\", { float = true, center = true, size = \"950 650\" })'";
       };
       memory = {
         format   = "<span foreground='#00CC33'>󰟜 </span>{}%";
         interval = 2;
-        on-click-right = "hyprctl dispatch exec '[float; center; size 950 650] kitty --override font_size=14 --title float_kitty btop'";
+        on-click-right = "hyprctl dispatch 'hl.dsp.exec_cmd(\"kitty --override font_size=14 --title float_kitty btop\", { float = true, center = true, size = \"950 650\" })'";
       };
       network = {
         format-wifi         = "<span foreground='#00FF41'> </span> {signalStrength}%";
@@ -391,12 +394,12 @@ in
   };
 
   # ── Hyprland ──────────────────────────────────────────────────────────
-  # rules.conf and variables.conf are static — deployed as read-only symlinks.
-  # settings.conf, autostart.conf, keybindings.conf, monitors.conf, env.conf
-  # are generated at runtime by settings_watcher.sh from templates/.
-  # colors.conf is generated at runtime by matugen.
-  xdg.configFile."hypr/config/rules.conf".source     = ./rice/hypr/config/rules.conf;
-  xdg.configFile."hypr/config/variables.conf".source = ./rice/hypr/config/variables.conf;
+  # rules.lua and variables.lua are static — deployed as read-only symlinks.
+  # settings.lua, autostart.lua, keybindings.lua, monitors.lua, env.lua are
+  # generated at runtime by settings_watcher.sh from templates/.
+  # colors.lua is generated at runtime by matugen.
+  xdg.configFile."hypr/config/rules.lua".source     = ./rice/hypr/config/rules.lua;
+  xdg.configFile."hypr/config/variables.lua".source = ./rice/hypr/config/variables.lua;
   xdg.configFile."hypr/templates" = {
     source    = ./rice/hypr/templates;
     recursive = true;
@@ -407,26 +410,13 @@ in
   };
   wayland.windowManager.hyprland = {
     enable        = true;
-    configType    = "hyprlang";  # explicit: full Lua migration is a future task
+    configType    = "lua";
     package       = null;
     portalPackage = null;
     xwayland.enable = true;
     systemd.enable  = false;  # uwsm manages the session; HM integration stops graphical-session.target and kills uwsm
-    extraConfig = ''
-      source = ~/.config/hypr/colors.conf
-
-      submap = passthru
-      bind = SUPER SHIFT CTRL ALT, F35, exec, true
-      submap = reset
-
-      source = ~/.config/hypr/config/monitors.conf
-      source = ~/.config/hypr/config/env.conf
-      source = ~/.config/hypr/config/autostart.conf
-      source = ~/.config/hypr/config/variables.conf
-      source = ~/.config/hypr/config/settings.conf
-      source = ~/.config/hypr/config/rules.conf
-      source = ~/.config/hypr/config/keybindings.conf
-    '';
+    # Root Lua config (require order preserved from the previous hyprlang sources).
+    extraConfig = builtins.readFile ./rice/hypr/hyprland.lua;
   };
 
   # ── Hyprlock ──────────────────────────────────────────────────────────
@@ -506,6 +496,33 @@ in
     };
   };
 
+  # ── Wallpaper daemon ───────────────────────────────────────────────────
+  # Single owner of the awww daemon for the whole session, so the wallpaper
+  # survives every reboot. Previously init-wallpaper, the quickshell monitor
+  # popup and wall-change each spawned/killed their own daemon: two of those
+  # racing (kill + immediate respawn, or the broken `pgrep -x awww-daemon`
+  # guard, which never matches because the Nix wrapper renames the comm to
+  # `.awww-daemon-wr`) make the newcomer panic with "already running on this
+  # socket" — which can leave the session with no daemon and no wallpaper.
+  systemd.user.services.awww-daemon = {
+    Unit = {
+      Description          = "awww wallpaper daemon";
+      After                = [ "graphical-session.target" ];
+      PartOf               = [ "graphical-session.target" ];
+      ConditionEnvironment = "WAYLAND_DISPLAY";
+    };
+    Service = {
+      # Best effort: clear a stray non-service daemon holding the socket.
+      ExecStartPre = "-${pkgs.awww}/bin/awww kill";
+      ExecStart    = "${pkgs.awww}/bin/awww-daemon --no-cache";
+      Restart      = "always";
+      RestartSec   = "1";
+    };
+    Install = {
+      WantedBy = [ "graphical-session.target" ];
+    };
+  };
+
   # ── Border colour: self-heal at session start ─────────────────────────
   # Runs independently of init-wallpaper. If that script dies (bad wallpaper
   # path, matugen failure, missing PATH entry) the border still gets the
@@ -527,7 +544,7 @@ in
     };
   };
 
-  # Re-apply whenever matugen rewrites colors.conf (wallpaper change).
+  # Re-apply whenever matugen rewrites colors_raw.lua (wallpaper change).
   # Decouples applying the colour from whichever script invoked matugen.
   systemd.user.paths.border-colors = {
     Unit = {
@@ -535,7 +552,7 @@ in
       PartOf      = [ "graphical-session.target" ];
     };
     Path = {
-      PathChanged = "%h/.config/hypr/colors_raw.conf";
+      PathChanged = "%h/.config/hypr/colors_raw.lua";
       Unit        = "border-colors.service";
     };
     Install = {
@@ -547,19 +564,26 @@ in
   home.activation.setupRice = lib.hm.dag.entryAfter ["linkGeneration"] ''
     mkdir -p "$HOME/.config/hypr/config"
 
-    # colors.conf is owned by matugen. Seed it only so Hyprland has something
-    # to source before matugen has ever run. inactive_border matches the
-    # matugen template (rgba(00000000)); the old rgba(33333388) seed rendered
-    # as a literal grey border whenever this fallback was hit.
-    if [ ! -f "$HOME/.config/hypr/colors.conf" ]; then
-      echo '$active_border = rgba(00FF41ee)'   > "$HOME/.config/hypr/colors.conf"
-      echo '$inactive_border = rgba(00000000)' >> "$HOME/.config/hypr/colors.conf"
+    # colors.lua is owned by matugen. Seed it only so hyprland.lua has something
+    # to require before matugen has ever run. inactive_border matches the
+    # matugen template (rgba(00000000)).
+    if [ ! -f "$HOME/.config/hypr/colors.lua" ]; then
+      {
+        echo 'return {'
+        echo '  active_border   = "rgba(00FF41ee)",'
+        echo '  inactive_border = "rgba(00000000)",'
+        echo '}'
+      } > "$HOME/.config/hypr/colors.lua"
     fi
 
     # Seed raw too, so the transform has an input on a brand-new install.
-    if [ ! -f "$HOME/.config/hypr/colors_raw.conf" ]; then
-      echo '$active_border = rgba(00FF41ee)'   > "$HOME/.config/hypr/colors_raw.conf"
-      echo '$inactive_border = rgba(00000000)' >> "$HOME/.config/hypr/colors_raw.conf"
+    if [ ! -f "$HOME/.config/hypr/colors_raw.lua" ]; then
+      {
+        echo 'return {'
+        echo '  active_border   = "rgba(00FF41ee)",'
+        echo '  inactive_border = "rgba(00000000)",'
+        echo '}'
+      } > "$HOME/.config/hypr/colors_raw.lua"
     fi
 
     chmod -R +x "$HOME/.config/hypr/scripts/" 2>/dev/null || true

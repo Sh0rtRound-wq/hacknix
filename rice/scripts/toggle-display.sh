@@ -3,7 +3,8 @@
 DISPLAY="eDP-1"
 
 if hyprctl monitors | grep -q "^Monitor $DISPLAY"; then
-    hyprctl keyword monitor "$DISPLAY,disable"
+    hyprctl eval "hl.monitor({ output = \"$DISPLAY\", disabled = true })"
 else
-    hyprctl keyword monitor "$DISPLAY,preferred,auto,1"
+    hyprctl eval "hl.monitor({ output = \"$DISPLAY\", mode = \"preferred\", position = \"auto\", scale = 1 })"
+
 fi

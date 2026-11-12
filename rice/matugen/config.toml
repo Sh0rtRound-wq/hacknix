@@ -1,5 +1,8 @@
 [config]
 reload_apps = false
+# Never allow a light scheme: matugen defaults to dark, this pins it so no
+# invocation can produce light backgrounds/washed accents.
+mode = "dark"
 
 [templates.quickshell]
 input_path  = "~/.config/matugen/templates/qs_colors.json.template"
@@ -49,9 +52,9 @@ input_path  = "~/.config/matugen/templates/qt-style.qss.template"
 output_path = "~/.config/qt6ct/qss/matugen-style.qss"
 
 [templates.hyprland]
-input_path  = "~/.config/matugen/templates/hyprland.conf.template"
+input_path  = "~/.config/matugen/templates/hyprland.lua.template"
 # Raw output. deepen-colors.py applies the neon transform (S->100%, L->0.50-
-# 0.65) and writes colors.conf, which is what hyprland.conf sources. Matugen
-# must NOT write colors.conf directly: primary_container is S100% but only
-# L44%, which reads as a dark colour rather than neon.
-output_path = "~/.config/hypr/colors_raw.conf"
+# 0.65) and writes colors.lua, which hyprland.lua requires. Matugen must NOT
+# write colors.lua directly: primary_container is S100% but only L44%, which
+# reads as a dark colour rather than neon.
+output_path = "~/.config/hypr/colors_raw.lua"

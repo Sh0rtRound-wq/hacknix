@@ -57,4 +57,4 @@ def score(w):
         return (abs(wcx - acx), abs(wcy - acy))   # minimize horizontal gap first
 
 best = min(candidates, key=score)
-subprocess.run(["hyprctl", "dispatch", "focuswindow", f"address:{best['address']}"])
+subprocess.run(["hyprctl", "dispatch", "hl.dsp.focus({{ window = \"address:{0}\" }})".format(best["address"])])

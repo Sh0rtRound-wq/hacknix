@@ -28,11 +28,13 @@ handle-monitor-state() {
 
         # only disable eDP-1 if more than 1 monitor is active
         if [ "$enabled_count" -gt 1 ]; then
-            hyprctl keyword monitor "eDP-1,disable"
+            hyprctl eval 'hl.monitor({ output = "eDP-1", disabled = true })'
+
         fi
     else
         # no external monitor - enable laptop screen
-        hyprctl keyword monitor "eDP-1,preferred,auto,1"
+        hyprctl eval 'hl.monitor({ output = "eDP-1", mode = "preferred", position = "auto", scale = 1 })'
+
     fi
 }
 

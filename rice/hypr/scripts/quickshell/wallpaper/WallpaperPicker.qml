@@ -187,7 +187,7 @@ Item {
                     fi
                     echo "$DEST_FILE" > "$HOME/.config/hypr/wallpaper"
 
-                    ( matugen image --source-color-index 0 "$FINAL_THUMB" || true; bash "$RELOAD_SCRIPT" || true ) &
+                    ( matugen image --type scheme-vibrant --contrast 1.0 --mode dark --source-color-index 0 "$FINAL_THUMB" || true; bash "$RELOAD_SCRIPT" || true ) &
                 `;
                 Quickshell.execDetached(["bash", "-c", applyScript]);
             } else {
@@ -230,7 +230,7 @@ Item {
                         fi
                         echo "$DEST_FILE" > "$HOME/.config/hypr/wallpaper"
 
-                        ( matugen image --source-color-index 0 "$FINAL_THUMB" || true; bash "$RELOAD_SCRIPT" || true ) &
+                        ( matugen image --type scheme-vibrant --contrast 1.0 --mode dark --source-color-index 0 "$FINAL_THUMB" || true; bash "$RELOAD_SCRIPT" || true ) &
                     fi
                 `;
                 Quickshell.execDetached(["bash", "-c", downloadScript]);
@@ -280,7 +280,7 @@ Item {
             pkill mpvpaper || true
             
             ${wallpaperCmd}
-            ( matugen image --source-color-index 0 "${escThumb}" || true; bash "${escReload}" || true ) &
+            ( matugen image --type scheme-vibrant --contrast 1.0 --mode dark --source-color-index 0 "${escThumb}" || true; bash "${escReload}" || true ) &
         `;
         Quickshell.execDetached(["bash", "-c", fullScript]);
         if (closeCallback) Qt.callLater(closeCallback);

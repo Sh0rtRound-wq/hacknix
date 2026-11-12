@@ -33,7 +33,10 @@ Item {
 
     Process {
         id: themeReader
-        command: ["cat", "/tmp/qs_colors.json"]
+        // /tmp is the working location; ~/.cache/hypr/qs_colors.json is the
+        // persistent mirror deepen-colors.py writes, so a tmpfiles cleanup or a
+        // fresh boot can never leave quickshell on its hardcoded fallback palette.
+        command: ["bash", "-c", "cat /tmp/qs_colors.json 2>/dev/null || cat $HOME/.cache/hypr/qs_colors.json 2>/dev/null"]
         stdout: StdioCollector {
             onStreamFinished: {
                 let txt = this.text.trim();
