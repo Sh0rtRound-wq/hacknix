@@ -116,7 +116,7 @@ Item {
     TuiPanel {
         id: panel
         label: "CALENDAR"
-        ctx: Qt.formatDateTime(window.currentTime, "MMMM yyyy").toUpperCase() + "  ·  " + Qt.formatTime(window.currentTime, "HH:mm:ss")
+        ctx: Qt.formatDateTime(window.currentTime, "MMMM yyyy").toUpperCase() + "  ·  " + Qt.formatTime(window.currentTime, "h:mm:ss AP")
         anchors.fill: parent
 
         // ── CLOCK + WEATHER ROW ───────────────────────────────────────────────
@@ -129,7 +129,7 @@ Item {
             Text {
                 id: clockText
                 anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; anchors.leftMargin: 10
-                text: Qt.formatTime(window.currentTime, "HH:mm:ss")
+                text: Qt.formatTime(window.currentTime, "h:mm:ss AP")
                 font.family: "JetBrains Mono"; font.pixelSize: 20; color: panel.accent
             }
 
