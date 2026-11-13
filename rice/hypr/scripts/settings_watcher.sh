@@ -126,8 +126,27 @@ compile_settings() {
     LANG=$(jq -r '.language // "us"' "$SETTINGS_FILE")
     KB_OPT=$(jq -r '.kbOptions // "grp:alt_shift_toggle"' "$SETTINGS_FILE")
     MOUSE_SENSITIVITY=$(jq -r '.mouseSensitivity // "-0.1"' "$SETTINGS_FILE")
-    TOUCHPAD_SENSITIVITY=$(jq -r '.touchpadSensitivity // "0.8"' "$SETTINGS_FILE")
+    TOUCHPAD_SENSITIVITY=$(jq -r '.touchpadSensitivity // "1.0"' "$SETTINGS_FILE")
     _TOUCHPAD_STORED=$(jq -r '.touchpadMouseDevice // "none"' "$SETTINGS_FILE")
+    # Self-heal the touchpad device name. It is normally written by load_info.sh, which
+    # only runs when setting up a machine — so a fresh/regenerated settings.json, or any
+    # box where load_info.sh was never run, ends up with "none". With "none" both device
+    # blocks below match no device, Hyprland silently ignores them, and the touchpad
+    # inherits the global input:sensitivity (the *mouse* value) — i.e. mouse and touchpad
+    # end up the same speed, with no error. Detect it here instead.
+    if [ -z "$_TOUCHPAD_STORED" ] || [ "$_TOUCHPAD_STORED" = "none" ]; then
+        _TD_DETECT=$(grep -iE '^N: Name=.*(touchpad|trackpad|clickpad)' /proc/bus/input/devices 2>/dev/null \
+            | head -1 | sed 's/N: Name="//;s/"//' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+        if [ -n "$_TD_DETECT" ] && [ "$_TD_DETECT" != "none" ]; then
+            _TOUCHPAD_STORED="$_TD_DETECT"
+            _td_tmp="$(mktemp "$SETTINGS_FILE.XXXXXX")"
+            if jq --arg td "$_TD_DETECT" '.touchpadMouseDevice = $td' "$SETTINGS_FILE" > "$_td_tmp" 2>/dev/null && [ -s "$_td_tmp" ]; then
+                mv -f "$_td_tmp" "$SETTINGS_FILE"
+            else
+                rm -f "$_td_tmp"
+            fi
+        fi
+    fi
     if [ "$_TOUCHPAD_STORED" = "none" ]; then
         TOUCHPAD_MOUSE_DEV="none"
         TOUCHPAD_DEV="none"

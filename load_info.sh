@@ -26,7 +26,7 @@ if [[ "${1:-}" == "--stub" ]]; then
   amdBusId         = "";
   intelBusId       = "";
   mouseSensitivity    = "-0.1";
-  touchpadSensitivity = "0.8";
+  touchpadSensitivity = "1.0";
   qsTheme             = "modern";
 }
 NIXEOF
@@ -80,7 +80,7 @@ CURRENT_POWER="balanced"
 
 CURRENT_QS_THEME="modern"
 CURRENT_MOUSE_SENSITIVITY="-0.1"
-CURRENT_TOUCHPAD_SENSITIVITY="0.8"
+CURRENT_TOUCHPAD_SENSITIVITY="1.0"
 if [ -f "$CONFIG" ] && ! grep -q "# Stub" "$CONFIG"; then
   u=$(nix_str "user"               "$CONFIG"); [ -n "$u" ] && CURRENT_USER="$u"
   p=$(nix_str "powerProfile"       "$CONFIG"); [ -n "$p" ] && CURRENT_POWER="$p"
@@ -137,7 +137,7 @@ fi
 # Finds the touchpad in /proc/bus/input/devices, converts to Hyprland's
 # lowercase-hyphenated format, then derives the -mouse variant that handles
 # actual cursor movement. Written to settings.json so the device{} block in
-# settings.conf.template can use the exact name.
+# settings.lua.template can use the exact name.
 
 TOUCHPAD_MOUSE_DEV="none"
 TOUCHPAD_RAW=$(grep -iE '^N: Name=.*(touchpad|trackpad|clickpad)' \
@@ -211,7 +211,7 @@ fi
 
 # ── Write hardware env vars to settings.json ──────────────────────────────────
 # Populates the {{HARDWARE_ENV}} placeholder used by settings_watcher.sh
-# so the Hyprland env.conf gets the right GPU-specific vars on this machine.
+# so the Hyprland env (config/env.lua) gets the right GPU-specific vars on this machine.
 SETTINGS_JSON="$HOME/.config/hypr/settings.json"
 mkdir -p "$(dirname "$SETTINGS_JSON")"
 [ ! -f "$SETTINGS_JSON" ] && echo "{}" > "$SETTINGS_JSON"

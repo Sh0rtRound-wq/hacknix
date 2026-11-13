@@ -1,2 +1,0 @@
-$active_border = rgba({{colors.primary_container.default.hex_stripped}}ee)
-$inactive_border = rgba(00000000)
