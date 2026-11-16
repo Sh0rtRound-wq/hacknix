@@ -14,6 +14,7 @@ qpwgraph
 bolt-launcher
 plex-desktop
 deadlock-mod-manager
+feishin
 ];
 
 # nixadd
