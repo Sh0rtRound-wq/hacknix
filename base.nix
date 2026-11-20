@@ -358,6 +358,7 @@ exfatprogs
     };
   };
 
+
   services.ollama = {
     enable  = true;
     package = if isNvidia then pkgs.ollama-cuda
@@ -367,7 +368,6 @@ exfatprogs
 
   services.printing.enable             = false;
   programs.dconf.enable                = true;
-  virtualisation.libvirtd.enable = true;
   virtualisation.docker.enable   = true;
   hardware.graphics.enable       = true;
   hardware.graphics.enable32Bit  = true;
